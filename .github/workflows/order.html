@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Form Order - Pendaftaran Pesanan</title>
+  <style>
+    :root{--accent:#2563eb;--muted:#6b7280}
+    body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;line-height:1.4;margin:0;padding:24px;background:#f8fafc;color:#0f172a}
+    .card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06);max-width:1100px;margin:0 auto}
+    h1{margin:0 0 12px;font-size:20px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select,button{font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #e6e9ef}
+    input[type="date"]{padding:7px 10px}
+    .flex-1{flex:1}
+    .btn{background:var(--accent);color:#fff;border:none;cursor:pointer}
+    .btn.ghost{background:transparent;color:var(--accent);border:1px solid #dbeafe}
+    .items-list{margin-top:8px}
+    .item-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .item-row select{min-width:220px}
+    .item-row input[type=number]{width:90px}
+    .item-row button{background:#ef4444}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px}
+    .small{font-size:13px;color:var(--muted)}
+    .totals{display:flex;gap:10px;align-items:center;margin-top:10px}
+    @media (max-width:700px){.row{flex-direction:column}.item-row{flex-direction:column;align-items:flex-start}.item-row select{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Form Order — Tambah Pesanan</h1>
+    <div style="margin-bottom:12px" class="small">Isi data order lalu klik <strong>Tambah Order</strong>. Anda bisa menambahkan beberapa item per order.</div>
+
+    <div class="row" style="margin-bottom:12px">
+      <div style="min-width:180px">
+        <label for="orderDate">Tanggal Order</label>
+        <input id="orderDate" type="date" />
+      </div>
+      <div class="flex-1">
+        <label for="customerName">Nama</label>
+        <input id="customerName" type="text" placeholder="Nama pelanggan" />
+      </div>
+      <div style="min-width:200px">
+        <label>Pembayaran</label>
+        <select id="paymentMethod">
+          <option value="cash">Cash</option>
+          <option value="transfer">Transfer</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label>Tambah Orderan (pilih barang & jumlah)</label>
+      <div class="items-list" id="itemsList"></div>
+      <div style="margin-top:8px">
+        <button id="addItemBtn" class="btn">+ Tambah Item</button>
+        <button id="resetItems" class="btn ghost" style="margin-left:8px">Reset Item</button>
+      </div>
+
+      <div class="totals">
+        <div class="small">Total Barang: <strong id="totalQty">0</strong></div>
+        <div class="small">Total Harga (opsional): <strong id="totalPrice">0</strong></div>
+      </div>
+
+      <div style="margin-top:14px">
+        <button id="addOrder" class="btn">Tambah Order</button>
+        <button id="exportCsv" class="btn ghost" style="margin-left:8px">Export CSV</button>
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px;font-size:16px">Daftar Order</h2>
+    <table id="ordersTable">
+      <thead>
+        <tr><th>Tanggal</th><th>Nama</th><th>Items</th><th>Jumlah</th><th>Pembayaran</th><th>Aksi</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    // Sample daftar barang (nama dan harga opsional)
+    const catalog = [
+      {id: 'roti', name: 'Roti Tawar', price: 5000},
+      {id: 'air', name: 'Air Mineral 600ml', price: 4000},
+      {id: 'kopi', name: 'Kopi Sachet', price: 3000},
+      {id: 'mie', name: 'Mie Instan', price: 3500},
+      {id: 'buah', name: 'Pisang (ikat)', price: 8000}
+    ];
+
+    const itemsListEl = document.getElementById('itemsList');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const resetItemsBtn = document.getElementById('resetItems');
+    const totalQtyEl = document.getElementById('totalQty');
+    const totalPriceEl = document.getElementById('totalPrice');
+    const addOrderBtn = document.getElementById('addOrder');
+    const ordersTableBody = document.querySelector('#ordersTable tbody');
+    const exportCsvBtn = document.getElementById('exportCsv');
+
+    let currentItems = [];
+    let orders = [];
+
+    function createItemRow(itemObj){
+      const idx = currentItems.length;
+      currentItems.push(itemObj || {productId:'',qty:1,price:0});
+
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.dataset.index = idx;
+
+      const select = document.createElement('select');
+      const emptyOpt = document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='-- Pilih barang --'; select.appendChild(emptyOpt);
+      catalog.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.name; o.dataset.price=p.price; select.appendChild(o); });
+
+      const qty = document.createElement('input'); qty.type='number'; qty.min='1'; qty.value=itemObj?.qty||1;
+      const price = document.createElement('input'); price.type='number'; price.min='0'; price.value=itemObj?.price||0; price.placeholder='harga (opsional)';
+
+      const del = document.createElement('button'); del.type='button'; del.textContent='Hapus'; del.style.padding='6px 10px'; del.style.borderRadius='8px'; del.style.color='#fff';
+
+      del.addEventListener('click',()=>{
+        const i = Number(row.dataset.index);
+        currentItems[i] = null;
+        row.remove();
+        refreshTotals();
+      });
+
+      select.addEventListener('change', ()=>{
+        const selected = catalog.find(c=>c.id===select.value);
+        const i = Number(row.dataset.index);
+        if(selected){
+          currentItems[i] = currentItems[i] || {};
+          currentItems[i].productId = selected.id;
+          currentItems[i].name = selected.name;
+          // jika user belum mengisi harga, isi harga default
+          if(!price.value || price.value==0) price.value = selected.price || 0;
+          currentItems[i].price = Number(price.value)||0;
+        }
+        refreshTotals();
+      });
+
+      qty.addEventListener('input', ()=>{
+        const i = Number(row.dataset.index);
+        currentItems[i] = currentItems[i] || {};
+        currentItems[i].qty = Number(qty.value)||0;
+        refreshTotals();
+      });
+
+      price.addEventListener('input', ()=>{
+        const i = Number(row.dataset.index);
+        currentItems[i] = currentItems[i] || {};
+        currentItems[i].price = Number(price.value)||0;
+        refreshTotals();
+      });
+
+      // build row
+      row.appendChild(select);
+      row.appendChild(qty);
+      row.appendChild(price);
+      row.appendChild(del);
+      itemsListEl.appendChild(row);
+
+      refreshTotals();
+    }
+
+    function refreshTotals(){
+      const valid = currentItems.filter(i=>i && i.productId);
+      const totalQty = valid.reduce((s,i)=>s + (Number(i.qty)||0),0);
+      const totalPrice = valid.reduce((s,i)=>s + ((Number(i.qty)||0) * (Number(i.price)||0)),0);
+      totalQtyEl.textContent = totalQty;
+      totalPriceEl.textContent = totalPrice.toLocaleString();
+    }
+
+    addItemBtn.addEventListener('click', ()=> createItemRow());
+    resetItemsBtn.addEventListener('click', ()=>{
+      currentItems = [];
+      itemsListEl.innerHTML = '';
+      refreshTotals();
+    });
+
+    addOrderBtn.addEventListener('click', ()=>{
+      const date = document.getElementById('orderDate').value || new Date().toISOString().slice(0,10);
+      const name = document.getElementById('customerName').value.trim();
+      const payment = document.getElementById('paymentMethod').value;
+      const validItems = currentItems.filter(i=>i && i.productId).map(i=>({id:i.productId,name:i.name,qty:Number(i.qty)||0,price:Number(i.price)||0}));
+      if(!name){ alert('Masukkan nama pelanggan'); return; }
+      if(validItems.length===0){ alert('Tambahkan minimal 1 item'); return; }
+
+      const totalQty = validItems.reduce((s,i)=>s+i.qty,0);
+      const totalPrice = validItems.reduce((s,i)=>s + i.qty * i.price,0);
+
+      const order = {id:Date.now().toString(36),date,name,items:validItems,totalQty,totalPrice,payment};
+      orders.push(order);
+      renderOrders();
+
+      // reset form
+      document.getElementById('customerName').value='';
+      currentItems = [];
+      itemsListEl.innerHTML = '';
+      refreshTotals();
+    });
+
+    function renderOrders(){
+      ordersTableBody.innerHTML = '';
+      orders.forEach((o,idx)=>{
+        const tr = document.createElement('tr');
+        const itemsText = o.items.map(it=>`${it.name} x${it.qty}`).join(', ');
+        tr.innerHTML = `<td>${o.date}</td><td>${escapeHtml(o.name)}</td><td>${escapeHtml(itemsText)}</td><td>${o.totalQty}</td><td>${o.payment}</td><td><button data-idx="${idx}" class="delRow">Hapus</button></td>`;
+        ordersTableBody.appendChild(tr);
+      });
+
+      // attach delete handlers
+      document.querySelectorAll('.delRow').forEach(btn=>btn.addEventListener('click', (e)=>{
+        const i = Number(e.target.dataset.idx);
+        if(confirm('Hapus order ini?')){ orders.splice(i,1); renderOrders(); }
+      }));
+    }
+
+    exportCsvBtn.addEventListener('click', ()=>{
+      if(orders.length===0){ alert('Belum ada order untuk diexport'); return; }
+      const rows = [];
+      rows.push(['Tanggal','Nama','Items','Jumlah Total','Total Harga','Pembayaran']);
+      orders.forEach(o=> rows.push([o.date,o.name,o.items.map(it=>`${it.name} x${it.qty}`).join('; '),o.totalQty,o.totalPrice,o.payment]));
+      const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'orders.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // helper
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]; }); }
+
+    // init with one empty item row
+    createItemRow();
+  </script>
+</body>
+</html>
