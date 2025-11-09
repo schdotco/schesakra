@@ -13,7 +13,6 @@
       width:100%; border-radius:8px; cursor:pointer; font-size:16px;
     }
     button:hover { background:#2563eb; }
-    .hidden { display:none; }
   </style>
 </head>
 <body>
@@ -31,17 +30,15 @@
 </div>
 
 <div class="box">
-  <h3>Upload Bukti Transfer</h3>
+  <h3>Kirim Bukti Transfer via WhatsApp</h3>
   <input type="file" id="proofFile"><br><br>
-  <button id="uploadBtn">Upload Bukti & Selesaikan Pembayaran</button>
+  <button id="sendWA">Kirim ke WhatsApp</button>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, doc, getDoc, updateDoc } 
+import { getFirestore, doc, getDoc } 
 from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } 
-from "https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
@@ -54,49 +51,53 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
+// Ambil Order ID
 const orderId = localStorage.getItem("selectedOrderId");
 if(!orderId){
   alert("❌ Order ID tidak ditemukan.");
   window.location.href = "order_list.html";
 }
 
+// Ambil Data Order
+let orderData;
 const docRef = doc(db, "orders", orderId);
 const snapshot = await getDoc(docRef);
 
 if(snapshot.exists()){
-  const data = snapshot.data();
+  orderData = snapshot.data();
   document.getElementById("orderInfo").innerHTML = `
-    <b>Nama:</b> ${data.name} <br>
-    <b>Tanggal Order:</b> ${data.date} <br>
-    <b>Total Pembayaran:</b> <span style="color:green;">Rp ${data.grand.toLocaleString()}</span><br>
-    <b>Status:</b> ${data.status.toUpperCase()}
+    <b>Nama:</b> ${orderData.name}<br>
+    <b>Tanggal Order:</b> ${orderData.date}<br>
+    <b>Total Bayar:</b> <span style="color:green;">Rp ${orderData.grand.toLocaleString()}</span><br>
+    <b>Status:</b> ${orderData.status.toUpperCase()}
   `;
 } else {
   alert("❌ Order tidak ditemukan!");
   window.location.href = "order_list.html";
 }
 
-document.getElementById("uploadBtn").onclick = async () => {
-  const file = document.getElementById("proofFile").files[0];
-  if(!file) return alert("Silakan pilih file bukti transfer!");
+// Tombol Kirim WhatsApp
+document.getElementById("sendWA").onclick = () => {
+  const fileCheck = document.getElementById("proofFile").files.length;
+  if(fileCheck === 0){
+    alert("Silakan pilih bukti transfer terlebih dahulu!");
+    return;
+  }
 
-  document.getElementById("uploadBtn").innerText = "Mengupload...";
-  document.getElementById("uploadBtn").disabled = true;
+  const message = encodeURIComponent(
+`Halo, saya ingin konfirmasi pembayaran.
 
-  const storageRef = ref(storage, `bukti_transfer/${orderId}.jpg`);
-  await uploadBytes(storageRef, file);
+Nama: ${orderData.name}
+Tanggal: ${orderData.date}
+Total: Rp ${orderData.grand.toLocaleString()}
+Order ID: ${orderId}
 
-  const url = await getDownloadURL(storageRef);
+Saya lampirkan bukti transfer.`
+  );
 
-  await updateDoc(docRef, {
-    status: "paid",
-    proofUrl: url
-  });
-
-  alert("✅ Pembayaran berhasil dikonfirmasi! Status sekarang: PAID ✅");
-  window.location.href = "order_list.html";
+  // Buka WhatsApp
+  window.location.href = `https://wa.me/62816772145?text=${message}`;
 };
 </script>
 
