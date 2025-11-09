@@ -4,25 +4,45 @@
 <meta charset="UTF-8">
 <title>Rekapitulasi Pesanan</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Flatpickr untuk picker tanggal -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 <style>
-body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; color:#1f2937; }
-h2 { text-align:center; margin-bottom:10px; }
-.button-back {
-  display:block;
-  margin: 0 auto 20px auto;
-  background:#3b82f6; color:white; border:none; padding:10px 16px;
-  border-radius:8px; cursor:pointer; font-size:14px; transition:0.2s;
+body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:16px; color:#1f2937; }
+h2 { text-align:center; margin-bottom:16px; }
+.filter-box {
+  max-width: 550px; margin: 0 auto 16px auto;
+  background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
 }
-.button-back:hover { background:#2563eb; }
+.filter-box input { padding:10px; border-radius:8px; border:1px solid #ccc; width:120px; }
+.filter-box button {
+  background:#3b82f6; color:white; border:none; padding:10px 16px; border-radius:8px; cursor:pointer;
+  transition:0.2s;
+}
+.filter-box button:hover { background:#2563eb; }
+
 .table-box {
-  background:white; padding:20px; border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  overflow-x:auto;
+  background:white; padding:16px; border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08); overflow-x:auto;
 }
 table { width:100%; border-collapse: collapse; margin-top:10px; }
 th, td { border:1px solid #ddd; padding:10px; text-align:left; }
 th { background:#f3f4f6; }
 .total-row { font-weight:bold; background:#e5e7eb; }
+
+.button-back {
+  display:block; margin:0 auto 12px auto;
+  background:#10b981; color:white; border:none; padding:10px 16px;
+  border-radius:8px; cursor:pointer; transition:0.2s;
+}
+.button-back:hover { background:#059669; }
+
+@media (max-width:480px){
+  .filter-box { flex-direction: column; gap:6px; align-items:center; }
+  .filter-box input { width:80%; }
+}
 </style>
 </head>
 <body>
@@ -31,6 +51,13 @@ th { background:#f3f4f6; }
 
 <!-- Tombol Kembali -->
 <button class="button-back" onclick="goBack()">← Kembali ke Daftar Order</button>
+
+<!-- Filter Tanggal -->
+<div class="filter-box">
+  <input type="text" id="startDate" placeholder="Tanggal Awal">
+  <input type="text" id="endDate" placeholder="Tanggal Akhir">
+  <button onclick="applyFilter()">Terapkan Filter</button>
+</div>
 
 <div class="table-box">
 <table>
@@ -74,19 +101,26 @@ const rekapBody = document.getElementById("rekapBody");
 const grandQtyEl = document.getElementById("grandQty");
 const grandTotalEl = document.getElementById("grandTotal");
 
+flatpickr("#startDate", { dateFormat: "Y-m-d" });
+flatpickr("#endDate", { dateFormat: "Y-m-d" });
+
+let allOrders = []; // simpan semua order agar bisa filter
+
 async function loadRekap() {
   const snapshot = await getDocs(collection(db, "orders"));
+  allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  renderRekap(allOrders);
+}
+
+function renderRekap(orders) {
   const itemsMap = {};
   let grandTotal = 0;
   let grandQty = 0;
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
+  orders.forEach(data => {
     if(data.status === "confirmed") {
       data.items.forEach(item => {
-        if(!itemsMap[item.nm]){
-          itemsMap[item.nm] = {qty:0, total:0};
-        }
+        if(!itemsMap[item.nm]) itemsMap[item.nm] = {qty:0, total:0};
         itemsMap[item.nm].qty += item.q;
         itemsMap[item.nm].total += item.q * item.p;
         grandQty += item.q;
@@ -105,11 +139,7 @@ async function loadRekap() {
 
   for(const [name, info] of Object.entries(itemsMap)){
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${name}</td>
-      <td>${info.qty}</td>
-      <td>Rp ${info.total.toLocaleString()}</td>
-    `;
+    tr.innerHTML = `<td>${name}</td><td>${info.qty}</td><td>Rp ${info.total.toLocaleString()}</td>`;
     rekapBody.appendChild(tr);
   }
 
@@ -117,12 +147,34 @@ async function loadRekap() {
   grandTotalEl.textContent = "Rp " + grandTotal.toLocaleString();
 }
 
-loadRekap();
+// Fungsi filter tanggal
+function applyFilter() {
+  const start = document.getElementById("startDate").value;
+  const end = document.getElementById("endDate").value;
 
-// Fungsi tombol kembali
+  if(!start || !end){
+    alert("Pilih tanggal awal dan akhir!");
+    return;
+  }
+
+  const filtered = allOrders.filter(o => {
+    const orderDate = new Date(o.date);
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    // buat akhir hari agar inklusif
+    endDate.setHours(23,59,59,999);
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+
+  renderRekap(filtered);
+}
+
+// Tombol kembali
 function goBack(){
   window.location.href = "order_list.html";
 }
+
+loadRekap();
 </script>
 
 </body>
