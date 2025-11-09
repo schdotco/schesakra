@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Order + Pembayaran (Stripe) — Demo</title>
+
+  <!-- Stripe.js (required untuk confirmCardPayment) -->
+  <script src="https://js.stripe.com/v3/"></script>
+
+  <!-- Firebase modular SDK (v9+) -->
+  <script type="module">
+    // NOTE: this <script type="module"> will import firebase modules inside the body script below.
+    // We still include a small global marker here so the browser preloads modules quickly.
+  </script>
+
+  <style>
+    /* Simple tidy UI, neutral tones */
+    :root{
+      --bg:#f3f7f9; --card:#ffffff; --accent:#0ea5a1; --danger:#ef4444; --muted:#6b7280;
+    }
+    body{font-family:Inter, system-ui, Arial; margin:0; background:var(--bg); color:#0f172a; padding:20px;}
+    .wrap{max-width:980px; margin:0 auto;}
+    .card{background:var(--card); border-radius:12px; padding:18px; box-shadow:0 6px 20px rgba(15,23,42,0.06); margin-bottom:16px;}
+    h1,h2{margin:0 0 8px 0}
+    label{display:block; margin-top:10px; color:var(--muted); font-size:13px}
+    input, select, button { padding:10px 12px; border-radius:8px; border:1px solid #e6eef2; font-size:14px; width:100%;}
+    .row{display:flex; gap:12px; margin-top:12px;}
+    .row > *{flex:1;}
+    .btn { background:var(--accent); color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+    .btn.ghost { background:transparent; color:var(--accent); border:1px solid rgba(14,165,161,0.18); }
+    .muted{color:var(--muted); font-size:13px;}
+    table{width:100%; border-collapse:collapse; margin-top:12px;}
+    th,td{padding:8px; border-bottom:1px solid #eef2f5; text-align:left; font-size:14px;}
+    .card-small{padding:10px; border-radius:8px; background:#fbfdfe; border:1px solid #eaf6f6}
+    #card-element{padding:10px 12px; border-radius:8px; background:#fff; border:1px solid #e6eef2}
+    .notice{font-size:13px;color:var(--muted); margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="card">
+      <h1>Order & Pembayaran</h1>
+      <div class="muted">Form order + integrasi pembayaran. Pastikan server Anda menangani pembayaran dan webhook.</div>
+      <div style="margin-top:10px;">
+        <a href="#/form" id="navForm" class="btn ghost" style="margin-right:8px">Form Order</a>
+        <a href="#/pay" id="navPay" class="btn ghost" style="margin-right:8px">Bayar Order</a>
+        <a href="#/admin" id="navAdmin" class="btn ghost">Admin</a>
+        <span style="float:right;">
+          <button id="btnSignOut" class="btn ghost" style="display:none">Logout</button>
+        </span>
+      </div>
+    </header>
+
+    <!-- MAIN CARD -->
+    <main id="app"></main>
+
+    <footer class="muted" style="margin-top:12px">Catatan: server harus mengembalikan clientSecret dari /api/create-payment-intent dan webhook server mengubah order.status = "paid" ketika pembayaran berhasil.</footer>
+  </div>
+
+  <!-- App script: imports Firebase (modular) and implements form, payment flow, admin -->
+  <script type="module">
+  // ==========================
+  // === CONFIG (EDITABLE) ===
+  // ==========================
+  // Paste Firebase config (from user)
+  const firebaseConfig = {
+    apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+    authDomain: "schesakra.firebaseapp.com",
+    projectId: "schesakra",
+    storageBucket: "schesakra.firebasestorage.app",
+    messagingSenderId: "672537227977",
+    appId: "1:672537227977:web:88b24f905c86eba7c05318",
+    measurementId: "G-Q7HSM1LK98"
+  };
+
+  // IMPORTANT: set your server base URL here (where /api/create-payment-intent is hosted)
+  // Example: const SERVER_BASE_URL = "https://my-server.example.com";
+  const SERVER_BASE_URL = "https://YOUR_SERVER_BASE_URL";
+
+  // Stripe publishable key (fill with your Stripe publishable key)
+  const STRIPE_PUBLISHABLE_KEY = "pk_test_XXXXXXXXXXXXXXXXXXXXXXXX";
+
+  // ==========================
+  // === IMPORTS & INIT      ===
+  // ==========================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import {
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    doc,
+    setDoc,
+    getDoc,
+    getDocs,
+    updateDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    limit
+  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Initialize Stripe (will be created when needed)
+  let stripe = null;
+
+  // simple router (hash-based)
+  const appEl = document.getElementById('app');
+  const btnSignOut = document.getElementById('btnSignOut');
+  const navForm = document.getElementById('navForm');
+  const navPay = document.getElementById('navPay');
+  const navAdmin = document.getElementById('navAdmin');
+
+  btnSignOut.addEventListener('click', async ()=> {
+    await signOut(auth);
+  });
+
+  // ==========================
+  // === UTIL FUNCTIONS     ===
+  // ==========================
+  function el(html){ const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+  function fmtRupiah(n){ return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); }
+  function showMessage(msg){ alert(msg); }
+
+  // ==========================
+  // === AUTH HELPERS       ===
+  // ==========================
+  onAuthStateChanged(auth, user => {
+    // toggle sign out
+    btnSignOut.style.display = user ? 'inline-block' : 'none';
+    // router: if admin path and not logged in -> show auth; else render route
+    route();
+  });
+
+  // ==========================
+  // === ROUTES / PAGES     ===
+  // ==========================
+  window.addEventListener('hashchange', route);
+  function route(){
+    const hash = location.hash || '#/form';
+    if(hash.startsWith('#/admin')) renderAdmin();
+    else if(hash.startsWith('#/pay')) renderPay();
+    else renderForm();
+  }
+
+  // --------------------------
+  // PAGE: Form Order (create pending order)
+  // --------------------------
+  async function renderForm(){
+    appEl.innerHTML = '';
+    const root = el(`
+      <div class="card">
+        <h2>Form Order</h2>
+        <div class="muted">Buat order baru. Setelah membuat order, Anda dapat melakukan pembayaran pada halaman "Bayar Order".</div>
+
+        <label for="orderDate">Tanggal</label>
+        <input id="orderDate" type="date" />
+
+        <label for="orderName">Nama Pemesan</label>
+        <input id="orderName" type="text" placeholder="Nama pelanggan" />
+
+        <label for="itemSelect">Pilih Item</label>
+        <select id="itemSelect"></select>
+
+        <div class="row">
+          <div>
+            <label>Jumlah</label>
+            <input id="itemQty" type="number" min="1" value="1" />
+          </div>
+          <div>
+            <label>Harga Satuan (opsional)</label>
+            <input id="itemPrice" type="number" min="0" value="0" />
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <button id="btnAddItem" class="btn">Tambah ke Keranjang</button>
+          <button id="btnCreateOrder" class="btn ghost" style="margin-left:8px">Simpan Order (Pending)</button>
+        </div>
+
+        <h3 style="margin-top:16px">Keranjang</h3>
+        <table id="cartTable"><thead><tr><th>Item</th><th>Qty</th><th>Harga</th><th>Total</th><th></th></tr></thead><tbody></tbody></table>
+
+        <div style="text-align:right; margin-top:8px" class="card-small">
+          <strong>Total: <span id="cartTotal">Rp 0</span></strong>
+        </div>
+      </div>
+    `);
+    appEl.appendChild(root);
+
+    // load items from Firestore ('items' collection)
+    const itemSelect = root.querySelector('#itemSelect');
+    const itemsSnap = await getDocs(collection(db,'items'));
+    const items = [];
+    itemsSnap.forEach(d => {
+      const data = d.data();
+      items.push({ id: d.id, name: data.name, price: data.price || 0, stock: data.stock || 0 });
+    });
+    // populate select
+    itemSelect.innerHTML = items.map(i => `<option value="${i.id}" data-price="${i.price}">${i.name} — ${fmtRupiah(i.price)} • Stok: ${i.stock}</option>`).join('');
+
+    // local cart
+    const cart = [];
+    function renderCart(){
+      const tbody = root.querySelector('#cartTable tbody');
+      tbody.innerHTML = cart.map((it, idx) => `<tr>
+        <td>${it.name}</td>
+        <td>${it.qty}</td>
+        <td>${fmtRupiah(it.price)}</td>
+        <td>${fmtRupiah(it.qty * it.price)}</td>
+        <td><button data-i="${idx}" class="btn ghost">Hapus</button></td>
+      </tr>`).join('');
+      // attach delete
+      tbody.querySelectorAll('button').forEach(b => b.addEventListener('click', ev => {
+        const i = Number(ev.target.dataset.i);
+        cart.splice(i,1);
+        renderCart();
+      }));
+      const total = cart.reduce((s,c) => s + (c.qty * c.price), 0);
+      root.querySelector('#cartTotal').innerText = fmtRupiah(total);
+    }
+
+    // set default price from selected item
+    itemSelect.addEventListener('change', ()=> {
+      const sel = itemSelect.selectedOptions[0];
+      const price = Number(sel.dataset.price || 0);
+      root.querySelector('#itemPrice').value = price;
+    });
+    // init
+    if(itemSelect.options.length > 0) itemSelect.dispatchEvent(new Event('change'));
+
+    root.querySelector('#btnAddItem').addEventListener('click', ()=> {
+      const selOpt = itemSelect.selectedOptions[0];
+      const id = selOpt.value;
+      const name = selOpt.textContent.split(' — ')[0];
+      const qty = Number(root.querySelector('#itemQty').value) || 1;
+      const price = Number(root.querySelector('#itemPrice').value) || 0;
+      cart.push({ id, name, qty, price });
+      renderCart();
+    });
+
+    // Create order in Firestore with status 'pending'
+    root.querySelector('#btnCreateOrder').addEventListener('click', async () => {
+      const date = root.querySelector('#orderDate').value || new Date().toISOString().slice(0,10);
+      const name = root.querySelector('#orderName').value.trim();
+      if(!name){ showMessage('Isi nama pemesan'); return; }
+      if(cart.length === 0){ showMessage('Keranjang kosong'); return; }
+      const grand = cart.reduce((s,c)=>s + c.qty*c.price, 0);
+      // create order doc: status = 'pending'
+      const docRef = await addDoc(collection(db,'orders'), {
+        date, name, items: cart, grand, status: 'pending', createdAt: Date.now()
+      });
+      showMessage('Order tersimpan (ID: ' + docRef.id + '). Lanjutkan ke tab "Bayar Order" untuk melakukan pembayaran.');
+      // optional: save lastOrderId in localStorage for easy access
+      localStorage.setItem('lastOrderId', docRef.id);
+      // clear cart form
+      cart.splice(0, cart.length);
+      renderCart();
+    });
+  }
+
+  // --------------------------
+  // PAGE: Pay Order
+  // - Choose existing order (status pending), call server to create PaymentIntent
+  // - Use Stripe.js card element to confirm payment
+  // --------------------------
+  async function renderPay(){
+    appEl.innerHTML = '';
+    const root = el(`
+      <div class="card">
+        <h2>Bayar Order</h2>
+        <div class="muted">Pilih order yang berstatus "pending" lalu lakukan pembayaran (kartu). Server membuat PaymentIntent dan webhook akan menandai order sebagai paid.</div>
+
+        <label>Pilih Order (pending)</label>
+        <select id="orderSelect"></select>
+
+        <div id="orderPreview" class="card-small" style="margin-top:10px;display:none"></div>
+
+        <div style="margin-top:12px">
+          <label>Informasi Kartu</label>
+          <div id="card-element"></div>
+          <div id="card-errors" class="muted"></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <button id="btnPayNow" class="btn">Bayar Sekarang</button>
+          <button id="btnPoll" class="btn ghost" style="margin-left:8px">Periksa Status</button>
+        </div>
+
+        <div id="payNotice" class="notice"></div>
+      </div>
+    `);
+    appEl.appendChild(root);
+
+    // Initialize Stripe client
+    if(!STRIPE_PUBLISHABLE_KEY || STRIPE_PUBLISHABLE_KEY.includes('pk_test_') === false){
+      // still let user proceed if they have custom key; we just warn when empty/placeholder
+      // If STRIPE_PUBLISHABLE_KEY is not set the Stripe-related actions will fail.
+    }
+    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+
+    // Create Stripe Elements and mount card element
+    const elements = stripe.elements();
+    const card = elements.create('card', { style: { base: { fontSize:'16px' } } });
+    card.mount('#card-element');
+
+    card.on('change', e => {
+      const elErrors = root.querySelector('#card-errors');
+      elErrors.textContent = e.error ? e.error.message : '';
+    });
+
+    // load pending orders from Firestore
+    const orderSelect = root.querySelector('#orderSelect');
+    async function loadPending(){
+      // query simple: here we read all orders and filter pending
+      const snap = await getDocs(collection(db,'orders'));
+      const pending = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if(data.status === 'pending') pending.push({ id: d.id, ...data });
+      });
+      if(pending.length === 0){
+        orderSelect.innerHTML = '<option value="">-- Tidak ada order pending --</option>';
+      }else{
+        orderSelect.innerHTML = pending.map(o => `<option value="${o.id}">${o.name} — ${o.date} — ${fmtRupiah(o.grand)}</option>`).join('');
+      }
+      // show preview when selection changes
+      orderSelect.dispatchEvent(new Event('change'));
+    }
+    orderSelect.addEventListener('change', ()=>{
+      const id = orderSelect.value;
+      const preview = root.querySelector('#orderPreview');
+      if(!id){ preview.style.display = 'none'; preview.innerHTML = ''; return; }
+      // fetch the order doc
+      (async ()=>{
+        const dRef = doc(db, 'orders', id);
+        const snap = await getDoc(dRef);
+        if(!snap.exists()){ preview.style.display='none'; preview.innerHTML='Order tidak ditemukan'; return; }
+        const data = snap.data();
+        preview.style.display = 'block';
+        preview.innerHTML = `<strong>${data.name}</strong><div class="muted">Tanggal: ${data.date} — Total: ${fmtRupiah(data.grand)} — Status: ${data.status}</div>
+          <div style="margin-top:8px">${(data.items||[]).map(it=>`${it.name} x${it.qty} @ ${fmtRupiah(it.price)}`).join('<br/>')}</div>`;
+      })();
+    });
+
+    // pay now handler
+    root.querySelector('#btnPayNow').addEventListener('click', async () => {
+      const orderId = orderSelect.value;
+      if(!orderId){ showMessage('Pilih order pending terlebih dahulu'); return; }
+
+      // fetch order to get amount
+      const orderSnap = await getDoc(doc(db,'orders',orderId));
+      if(!orderSnap.exists()){ showMessage('Order tidak ditemukan'); return; }
+      const order = orderSnap.data();
+      if(order.status !== 'pending'){ showMessage('Order bukan dalam status pending'); return; }
+
+      // Create PaymentIntent via server.
+      // Server endpoint: POST /api/create-payment-intent
+      // payload: { amount, currency, metadata: { orderId } }
+      // Server should create PaymentIntent with metadata.orderId and return { clientSecret }
+      const resp = await fetch(SERVER_BASE_URL + '/api/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+          // optionally include Authorization: Bearer <idToken> if your server requires it
+        },
+        body: JSON.stringify({
+          amount: Math.round(order.grand), // amount in smallest currency unit (IDR expects whole number)
+          currency: 'idr',
+          metadata: { orderId: orderId }
+        })
+      });
+
+      if(!resp.ok){
+        const txt = await resp.text();
+        showMessage('Gagal membuat PaymentIntent: ' + txt);
+        return;
+      }
+      const j = await resp.json();
+      const clientSecret = j.clientSecret;
+      if(!clientSecret){ showMessage('Server tidak mengembalikan clientSecret'); return; }
+
+      // Confirm the card payment on client using card element
+      root.querySelector('#payNotice').innerText = 'Memproses pembayaran...';
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: card,
+          billing_details: { name: order.name }
+        }
+      });
+
+      if(error){
+        // Payment failed (card error, etc.)
+        root.querySelector('#payNotice').innerText = 'Pembayaran gagal: ' + (error.message || 'unknown');
+        return;
+      }
+
+      // If succeeded, Stripe will return a paymentIntent and server webhook should update order.status = "paid".
+      // But to provide quick UX we can poll the order document to wait until server webhook flips the status.
+      root.querySelector('#payNotice').innerText = 'Pembayaran berhasil (Stripe). Menunggu konfirmasi server...';
+      await pollOrderPaid(orderId, root.querySelector('#payNotice'));
+      // reload pending list
+      await loadPending();
+    });
+
+    // manual poll button
+    root.querySelector('#btnPoll').addEventListener('click', async () => {
+      const id = orderSelect.value;
+      if(!id) return showMessage('Pilih order dulu');
+      await pollOrderPaid(id, root.querySelector('#payNotice'));
+    });
+
+    // Poll function: read order doc until status != pending or timeout
+    async function pollOrderPaid(orderId, noticeEl){
+      noticeEl.innerText = 'Menunggu status paid...';
+      const start = Date.now();
+      while(Date.now() - start < 30000){ // 30s timeout
+        const snap = await getDoc(doc(db,'orders',orderId));
+        if(!snap.exists()) { noticeEl.innerText = 'Order hilang'; return; }
+        const data = snap.data();
+        if(data.status === 'paid'){
+          noticeEl.innerText = 'Status: PAID. Terima kasih.';
+          return;
+        }
+        // wait a bit
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      noticeEl.innerText = 'Timeout: server belum mengonfirmasi pembayaran. Cek admin atau coba lagi.';
+    }
+
+    // initial load pending orders
+    await loadPending();
+  }
+
+  // --------------------------
+  // PAGE: Admin (role-based)
+  // - check admins/{uid} to authorize
+  // - list orders with search & simple pagination
+  // - allow marking order as paid (admin only)
+  // - allow adjusting stock per item
+  // --------------------------
+  async function renderAdmin(){
+    appEl.innerHTML = '';
+    const user = auth.currentUser;
+    if(!user){
+      appEl.appendChild(el(`<div class="card"><h2>Admin — Login</h2>
+        <div class="muted">Silakan login untuk akses admin.</div>
+        <div style="margin-top:8px"><input id="adminEmail" placeholder="email" /><input id="adminPass" placeholder="password" type="password" /></div>
+        <div style="margin-top:8px"><button id="btnAdminLogin" class="btn">Login</button></div></div>`));
+      document.getElementById('btnAdminLogin').addEventListener('click', async ()=>{
+        const em = document.getElementById('adminEmail').value;
+        const pw = document.getElementById('adminPass').value;
+        try{ await signInWithEmailAndPassword(auth, em, pw); showMessage('Login sukses'); renderAdmin(); } catch(e){ showMessage('Login gagal: ' + e.message); }
+      });
+      return;
+    }
+
+    // check admin role: read admins/{uid}
+    const admSnap = await getDoc(doc(db,'admins', user.uid));
+    if(!admSnap.exists()){
+      appEl.appendChild(el(`<div class="card"><h2>Akses Ditolak</h2><div class="muted">Anda bukan admin (admins/${user.uid} tidak ditemukan).</div></div>`));
+      return;
+    }
+
+    // admin UI
+    const root = el(`
+      <div class="card">
+        <h2>Admin — Laporan</h2>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input id="searchText" placeholder="Cari nama atau item"/>
+          <select id="filterStatus"><option value="">Semua</option><option value="pending">Pending</option><option value="paid">Paid</option></select>
+        </div>
+        <div id="ordersList" style="margin-top:12px"></div>
+        <div style="margin-top:8px">
+          <button id="prevBtn" class="btn ghost">Prev</button>
+          <button id="nextBtn" class="btn ghost">Next</button>
+        </div>
+
+        <hr style="margin:12px 0"/>
+
+        <h3>Manajemen Stok</h3>
+        <div id="stockArea"></div>
+
+        <hr style="margin:12px 0"/>
+
+        <h3>Assign Admin</h3>
+        <div style="display:flex;gap:8px">
+          <input id="assignUid" placeholder="UID user" />
+          <button id="btnAssign" class="btn">Tambahkan Admin</button>
+        </div>
+      </div>
+    `);
+    appEl.appendChild(root);
+
+    // load orders and implement simple search + pagination (client-side approach)
+    let ordersCache = [];
+    const perPage = 8;
+    let page = 0;
+
+    // snapshot live updates orders collection
+    onSnapshot(collection(db,'orders'), snap => {
+      ordersCache = [];
+      snap.forEach(d => ordersCache.push({ id: d.id, ...d.data() }));
+      renderOrders();
+    });
+
+    function renderOrders(){
+      const q = root.querySelector('#searchText').value.toLowerCase();
+      const status = root.querySelector('#filterStatus').value;
+      let filtered = ordersCache.filter(o => {
+        if(status && o.status !== status) return false;
+        if(!q) return true;
+        if(o.name && o.name.toLowerCase().includes(q)) return true;
+        if((o.items||[]).some(it => (it.name && it.name.toLowerCase().includes(q)) || (String(it.id).toLowerCase().includes(q)))) return true;
+        return false;
+      });
+      const pages = Math.max(1, Math.ceil(filtered.length / perPage));
+      if(page >= pages) page = pages - 1;
+      const start = page * perPage;
+      const pageItems = filtered.slice(start, start + perPage);
+      const container = root.querySelector('#ordersList');
+      container.innerHTML = pageItems.map(o => `
+        <div style="padding:8px;border-bottom:1px solid #eef2f5">
+          <div><strong>${o.name}</strong> <span class="muted">${o.date} — ${fmtRupiah(o.grand)}</span></div>
+          <div style="font-size:13px">${(o.items||[]).map(it => `${it.name} x${it.qty} @ ${fmtRupiah(it.price)}`).join('<br/>')}</div>
+          <div style="margin-top:6px">
+            <button data-id="${o.id}" class="markPaid btn ghost">${o.status === 'paid' ? 'Paid' : 'Mark Paid'}</button>
+            <button data-id="${o.id}" class="del btn ghost" style="margin-left:8px">Hapus</button>
+          </div>
+        </div>`).join('');
+      // attach handlers
+      container.querySelectorAll('.markPaid').forEach(b => b.addEventListener('click', async ev => {
+        const id = ev.target.dataset.id;
+        try{
+          await updateDoc(doc(db,'orders',id), { status: 'paid', paidAt: Date.now() });
+          showMessage('Order ditandai paid');
+        }catch(e){ showMessage('Error: ' + e.message); }
+      }));
+      container.querySelectorAll('.del').forEach(b => b.addEventListener('click', async ev => {
+        const id = ev.target.dataset.id;
+        if(!confirm('Hapus order?')) return;
+        try{
+          await setDoc(doc(db,'orders',id), {}); // overwrite empty (or use deleteDoc)
+          showMessage('Order terhapus');
+        }catch(e){ showMessage('Error: ' + e.message); }
+      }));
+    }
+
+    root.querySelector('#searchText').addEventListener('input', ()=> { page = 0; renderOrders(); });
+    root.querySelector('#filterStatus').addEventListener('change', ()=> { page = 0; renderOrders(); });
+    root.querySelector('#prevBtn').addEventListener('click', ()=> { if(page > 0) page--; renderOrders(); });
+    root.querySelector('#nextBtn').addEventListener('click', ()=> { page++; renderOrders(); });
+
+    // stock area: show items with editable stock
+    const stockArea = root.querySelector('#stockArea');
+    onSnapshot(collection(db,'items'), snap => {
+      stockArea.innerHTML = '';
+      snap.forEach(d => {
+        const it = d.data();
+        const row = el(`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <div style="flex:1"><strong>${it.name}</strong><div class="muted">${fmtRupiah(it.price)}</div></div>
+          <input data-id="${d.id}" style="width:120px" value="${it.stock || 0}" />
+          <button class="saveStock btn ghost" data-id="${d.id}">Simpan</button>
+        </div>`);
+        stockArea.appendChild(row);
+      });
+      stockArea.querySelectorAll('.saveStock').forEach(btn => btn.addEventListener('click', async ev => {
+        const id = ev.target.dataset.id;
+        const val = Number(stockArea.querySelector(`input[data-id="${id}"]`).value) || 0;
+        try{
+          await updateDoc(doc(db,'items',id), { stock: val });
+          showMessage('Stok tersimpan');
+        }catch(e){ showMessage('Gagal simpan stok: ' + e.message); }
+      }));
+    });
+
+    // assign admin
+    root.querySelector('#btnAssign').addEventListener('click', async () => {
+      const uid = root.querySelector('#assignUid').value.trim();
+      if(!uid) return showMessage('Masukkan UID');
+      try{
+        await setDoc(doc(db,'admins', uid), { role: 'admin', assignedBy: auth.currentUser.uid, createdAt: Date.now() });
+        showMessage('User diberi role admin');
+      }catch(e){
+        showMessage('Gagal assign: ' + e.message);
+      }
+    });
+  }
+
+  // initial route
+  route();
+  </script>
+</body>
+</html>
