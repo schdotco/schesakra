@@ -12,23 +12,23 @@
 <style>
 body {
   font-family: Arial, sans-serif;
-  background: #f6f9fc;
+  background: #f0f4f8;
   padding: 12px;
   margin: 0;
 }
 
 .container {
-  max-width: 550px;
+  max-width: 500px;
   width: 100%;
   margin: auto;
-  background: white;
-  padding: 16px;
+  background: #ffffff;
+  padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
 
-h2 { font-size: 1.6rem; margin-bottom: 12px; }
-h3 { font-size: 1.2rem; margin-top: 16px; }
+h2 { font-size: 1.5rem; margin-bottom: 16px; text-align:center; color:#1f2937; }
+h3 { font-size: 1.2rem; margin-top: 16px; color:#1f2937; }
 
 input, select, button {
   width: 100%;
@@ -37,6 +37,12 @@ input, select, button {
   border-radius: 8px;
   border: 1px solid #ccc;
   box-sizing: border-box;
+  font-size: 14px;
+}
+
+select {
+  cursor: pointer;
+  background: #fff;
 }
 
 button {
@@ -53,17 +59,25 @@ button:hover {
 
 .table-wrapper {
   overflow-x: auto;
+  margin-top: 12px;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 8px;
+  font-size: 14px;
 }
 
 td, th {
-  padding: 6px;
+  padding: 8px;
   text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+  background: #f3f4f6;
+  font-weight: 600;
 }
 
 .total-box {
@@ -71,14 +85,16 @@ td, th {
   text-align: right;
   margin-top: 12px;
   font-weight: bold;
+  color: #1f2937;
 }
 
 /* Media Query untuk layar kecil */
 @media (max-width: 480px) {
-  h2 { font-size: 1.4rem; }
+  h2 { font-size: 1.3rem; }
   h3 { font-size: 1.1rem; }
+  input, select, button { padding: 10px; font-size: 14px; }
+  table, th, td { font-size: 12px; }
   .total-box { font-size: 1.1rem; }
-  input, button, select { padding: 10px; font-size: 15px; }
 }
 </style>
 </head>
