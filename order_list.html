@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Daftar Order</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
+
+<style>
+body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
+h2 { text-align:center; }
+.table-box {
+  background:white; padding:20px; border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+table { width:100%; border-collapse: collapse; }
+th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+.status-unpaid { color:#d00000; font-weight:bold; }
+.status-paid { color:#007b1c; font-weight:bold; }
+.order-row:hover { background:#f1f5ff; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<h2>Daftar Order</h2>
+
+<div class="table-box">
+<table>
+<thead>
+<tr>
+  <th>Nama</th>
+  <th>Tanggal</th>
+  <th>Total</th>
+  <th>Status</th>
+</tr>
+</thead>
+<tbody id="orders"></tbody>
+</table>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ordersBody = document.getElementById("orders");
+
+// Real-time listener
+onSnapshot(collection(db, "orders"), snapshot=>{
+  ordersBody.innerHTML = "";
+  snapshot.forEach(doc=>{
+    const d=doc.data();
+    ordersBody.innerHTML += `
+      <tr class="order-row" onclick="viewOrder('${doc.id}')">
+        <td>${d.name}</td>
+        <td>${d.date}</td>
+        <td>Rp ${d.grand.toLocaleString()}</td>
+        <td class="status-${d.status}">${d.status.toUpperCase()}</td>
+      </tr>
+    `;
+  });
+});
+
+window.viewOrder=(id)=>{
+  localStorage.setItem("selectedOrderId", id);
+  window.location.href="order_pay.html"; // bisa diarahkan ke order detail
+};
+</script>
+
+</body>
+</html>
