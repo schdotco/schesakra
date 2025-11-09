@@ -160,6 +160,16 @@ document.getElementById("saveOrder").onclick = async ()=>{
   alert("✅ Order tersimpan!");
 };
 
+  document.getElementById("payButton").onclick = ()=>{
+  if(!currentOrderId){
+    alert("Order belum disimpan!");
+    return;
+  }
+
+  localStorage.setItem("selectedOrderId", currentOrderId);
+  window.location.href = "order_pay.html";
+};
+
 </script>
 
 </body>
