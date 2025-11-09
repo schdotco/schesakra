@@ -3,9 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Order App — Publik & Admin</title>
+  <title>Order App — Publik & Admin + Payment</title>
 
-  <!-- Simple styling (feel-free to swap to Tailwind/Bootstrap) -->
   <style>
     :root{
       --bg:#071827; --card:#0b1220; --accent:#06b6d4; --muted:#9aa6b2; --ok:#16a34a;
@@ -33,9 +32,11 @@
     .small{font-size:12px;color:var(--muted)}
     .danger{background:#ef4444;color:white;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
     .ok{background:var(--ok);color:#04280f;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
+    /* Stripe card placeholder */
+    #card-element { padding: 12px; background: rgba(255,255,255,0.02); border-radius:8px; }
+    #paymentModal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
+    #paymentModal .modal { background:var(--card); padding:16px; border-radius:8px; width:420px; max-width:90%;}
   </style>
-
-  <!-- Firebase modular SDK (use a stable v; here we import at runtime inside type=module) -->
 </head>
 <body>
   <div class="wrap">
@@ -52,59 +53,41 @@
 
     <main>
       <div id="app" class="card">
-        <!-- Content rendered by JS -->
         <p class="small">Memuat…</p>
       </div>
     </main>
   </div>
 
-  <!-- Application logic: single-file app using Firebase modular -->
+  <!-- Stripe.js (for client-side confirmCardPayment). Replace publishable key below -->
+  <script src="https://js.stripe.com/v3/"></script>
+
   <script type="module">
   /**************************************************************************
-   * Order App: public order form + auth + admin
-   * - Firestore collections used:
-   *    - items   (document id = itemId => { id, name, price, stock })
-   *    - orders  (auto id => { date, name, items: [{id,name,qty,price}], grand, payment, status, createdAt })
-   *    - admins  (optional: doc per uid to flag admin users) OR you can check a users collection
+   * Full single-file client app:
+   * - Firebase auth/firestore usage
+   * - Save order with ownerUid if logged in
+   * - Payment flow:
+   *   1) call server /api/create-payment-intent with orderId and ID token
+   *   2) server creates PaymentIntent (Stripe) and returns clientSecret
+   *   3) client shows Stripe Elements card input and calls confirmCardPayment(clientSecret)
+   *   4) on success, server webhook should mark order status 'paid' (but we also update client-side)
    *
-   * - Features implemented:
-   *    1) Public order form with multiple items, auto total preview
-   *    2) Authentication (register/login) for admin area
-   *    3) Admin page: search, pagination, mark paid, delete
-   *    4) Per-item stock update from admin
-   *    5) Stub for payment gateway integration (client-side hook)
-   *
-   * Replace firebaseConfig with your provided keys (already included below).
+   * IMPORTANT:
+   * - Set STRIPE_PUBLISHABLE_KEY to your key.
+   * - Ensure your server endpoint /api/create-payment-intent exists and validates ID token.
    **************************************************************************/
 
-  // Import Firebase (use latest 9+ modular version)
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
   import {
-    getAuth,
-    onAuthStateChanged,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut
+    getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+    signInWithEmailAndPassword, signOut
   } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-
   import {
-    getFirestore,
-    collection,
-    doc,
-    setDoc,
-    addDoc,
-    onSnapshot,
-    getDocs,
-    query,
-    where,
-    orderBy,
-    limit,
-    startAfter,
-    updateDoc,
-    getDoc
+    getFirestore, collection, doc, setDoc, addDoc, onSnapshot,
+    getDocs, query, where, orderBy, limit, startAfter, updateDoc, getDoc, deleteDoc, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-  // ----- CONFIG (you provided) -----
+  // ---------- CONFIG ----------
   const firebaseConfig = {
     apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
     authDomain: "schesakra.firebaseapp.com",
@@ -115,63 +98,60 @@
     measurementId: "G-Q7HSM1LK98"
   };
 
-  // init
+  // Replace with your Stripe publishable key
+  const STRIPE_PUBLISHABLE_KEY = "pk_test_REPLACE_WITH_YOURS";
+
+  // Replace with your server origin if different (used to call /api/create-payment-intent)
+  const SERVER_ORIGIN = ""; // e.g. "https://api.example.com" or "" for same origin
+
+  // ---------- INIT ----------
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 
-  // simple dom helpers
+  // DOM helpers
   const root = document.getElementById('app');
   const signBtn = document.getElementById('signBtn');
 
-  // --- ROUTING based on hash ---
-  function route() {
-    const hash = location.hash || '#/';
-    if (hash.startsWith('#/admin')) {
-      // admin route
-      if (auth.currentUser) renderAdmin();
-      else renderAuth();
-    } else {
-      // public form
-      renderForm();
-    }
-  }
-  window.addEventListener('hashchange', route);
+  function money(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
+  function nowDateISO(){ return new Date().toISOString().slice(0,10); }
 
-  // sign out button
-  signBtn.addEventListener('click', async () => {
-    await signOut(auth);
-  });
-
-  // --- UTILITIES ---
-  function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
-  function money(n) { return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID'); }
-  function nowDateISO() { return new Date().toISOString().slice(0,10); }
-
-  // ensure some items exist (seed) - only run once if collection empty
-  async function seedItemsIfEmpty() {
-    const itemsCol = collection(db, 'items');
-    // Quick check: getDocs (small cost)
-    const snap = await getDocs(itemsCol);
-    if (snap.size === 0) {
-      const seed = [
-        { id: 'pulpen', name: 'Pulpen', price: 3000, stock: 100 },
-        { id: 'bukutulis', name: 'Buku Tulis', price: 5000, stock: 50 },
-        { id: 'map', name: 'Map Plastik', price: 2000, stock: 80 },
-        { id: 'tinta', name: 'Tinta Printer', price: 75000, stock: 10 },
-        { id: 'a4', name: 'Kertas A4', price: 35000, stock: 40 }
+  // Seed items if empty
+  async function seedItemsIfEmpty(){
+    const col = collection(db,'items');
+    const snap = await getDocs(col);
+    if(snap.size===0){
+      const seed=[
+        { id:'pulpen',name:'Pulpen',price:3000,stock:100 },
+        { id:'bukutulis',name:'Buku Tulis',price:5000,stock:50 },
+        { id:'map',name:'Map Plastik',price:2000,stock:80 },
+        { id:'tinta',name:'Tinta Printer',price:75000,stock:10 },
+        { id:'a4',name:'Kertas A4',price:35000,stock:40 }
       ];
-      for (const it of seed) {
-        // set doc with custom ID (id field)
-        await setDoc(doc(db, 'items', it.id), it);
+      for(const it of seed){
+        await setDoc(doc(db,'items',it.id), it);
       }
     }
   }
 
+  // Simple router
+  function route(){
+    const hash = location.hash||'#/';
+    if(hash.startsWith('#/admin')){
+      if(auth.currentUser) renderAdmin();
+      else renderAuth();
+    } else {
+      renderForm();
+    }
+  }
+  window.addEventListener('hashchange', route);
+  signBtn.addEventListener('click', async ()=> await signOut(auth));
+
   /**************************************************************************
    * PUBLIC ORDER FORM
    **************************************************************************/
-  async function renderForm() {
+  async function renderForm(){
     await seedItemsIfEmpty();
 
     root.innerHTML = '';
@@ -189,7 +169,7 @@
         </div>
         <div style="margin-top:12px" class="flex">
           <button id="saveOrder" class="btn">Simpan Order</button>
-          <button id="payBtn" class="btn ghost">Bayar (integrasi)</button>
+          <button id="payBtn" class="btn ghost">Bayar Sekarang</button>
         </div>
       </section>
       <aside>
@@ -204,11 +184,9 @@
     const itemsList = container.querySelector('#itemsList');
     const totalPreview = container.querySelector('#totalPreview');
 
-    // load items once (snapshot to update live stock/prices)
-    onSnapshot(collection(db, 'items'), snap => {
-      // build itemsList summary
+    onSnapshot(collection(db,'items'), snap=>{
       itemsList.innerHTML = '';
-      snap.forEach(d => {
+      snap.forEach(d=>{
         const data = d.data();
         const div = document.createElement('div');
         div.style.display = 'flex';
@@ -218,47 +196,41 @@
                          <div><button data-id="${d.id}" class="quickAdd btn ghost">Tambah</button></div>`;
         itemsList.appendChild(div);
       });
-
-      // quick-add handlers
-      itemsList.querySelectorAll('.quickAdd').forEach(b => {
-        b.onclick = () => {
+      itemsList.querySelectorAll('.quickAdd').forEach(b=>{
+        b.onclick = async ()=>{
           const id = b.dataset.id;
-          // get doc to pull latest price/name
-          getDoc(doc(db, 'items', id)).then(snapDoc => {
-            if (!snapDoc.exists) { alert('Item tidak ditemukan'); return; }
-            const it = snapDoc.data();
-            addRow(it.id, it.name, it.price);
-          });
+          const snapDoc = await getDoc(doc(db,'items',id));
+          if(!snapDoc.exists()) { alert('Item tidak ditemukan'); return; }
+          const it = snapDoc.data();
+          addRow(it.id, it.name, it.price);
         };
       });
     });
 
-    // function to add an order row (select item, qty, price)
-    function addRow(itemId = '', itemName = '', price = 0, qty = 1) {
+    function addRow(itemId='', itemName='', price=0, qty=1){
       const row = document.createElement('div');
       row.className = 'order-row';
       row.style.display = 'flex';
       row.style.gap = '8px';
       row.style.marginTop = '8px';
 
-      // item select (we'll populate options from items collection)
       const select = document.createElement('select');
       select.innerHTML = '<option value="">-- pilih barang --</option>';
-      // fetch current items snapshot (simple: getDocs each add; for big scale, cache)
-      getDocs(collection(db, 'items')).then(sn => {
-        sn.forEach(d => {
+      // populate options
+      getDocs(collection(db,'items')).then(sn=>{
+        sn.forEach(d=>{
           const it = d.data();
           const opt = document.createElement('option');
           opt.value = d.id;
           opt.textContent = `${it.name} (Rp ${it.price.toLocaleString('id-ID')}) • stok:${it.stock}`;
-          if (d.id === itemId) opt.selected = true;
+          if(d.id === itemId) opt.selected = true;
           select.appendChild(opt);
         });
       });
 
-      const qtyInput = document.createElement('input'); qtyInput.type = 'number'; qtyInput.min = 1; qtyInput.value = qty; qtyInput.style.width = '80px';
-      const priceInput = document.createElement('input'); priceInput.type = 'number'; priceInput.value = price; priceInput.style.width = '120px';
-      const delBtn = document.createElement('button'); delBtn.textContent = 'Hapus'; delBtn.className = 'btn ghost';
+      const qtyInput = document.createElement('input'); qtyInput.type='number'; qtyInput.min=1; qtyInput.value=qty; qtyInput.style.width='80px';
+      const priceInput = document.createElement('input'); priceInput.type='number'; priceInput.value=price; priceInput.style.width='120px';
+      const delBtn = document.createElement('button'); delBtn.textContent='Hapus'; delBtn.className='btn ghost';
 
       row.appendChild(select);
       row.appendChild(qtyInput);
@@ -266,119 +238,179 @@
       row.appendChild(delBtn);
       rows.appendChild(row);
 
-      // update price when select changes (auto-fill price)
-      select.addEventListener('change', async () => {
+      select.addEventListener('change', async ()=>{
         const id = select.value;
-        if (!id) { priceInput.value = 0; updateTotal(); return; }
-        const s = await getDoc(doc(db, 'items', id));
-        if (s.exists()) {
-          const it = s.data();
-          priceInput.value = it.price;
-          updateTotal();
-        }
+        if(!id){ priceInput.value=0; updateTotal(); return; }
+        const s = await getDoc(doc(db,'items',id));
+        if(s.exists()){ priceInput.value = s.data().price; updateTotal(); }
       });
-      // update total on inputs change
-      [qtyInput, priceInput].forEach(i => i.addEventListener('input', updateTotal));
-      delBtn.addEventListener('click', () => { row.remove(); updateTotal(); });
+      [qtyInput, priceInput].forEach(i=>i.addEventListener('input', updateTotal));
+      delBtn.addEventListener('click', ()=>{ row.remove(); updateTotal(); });
 
       updateTotal();
     }
 
-    // add initial one row
+    // init one row
     addRow();
+    container.querySelector('#addRowBtn').addEventListener('click', ()=> addRow());
 
-    // "Tambah baris" button
-    container.querySelector('#addRowBtn').addEventListener('click', () => addRow());
-
-    // calculate preview total
-    function updateTotal() {
+    function updateTotal(){
       let total = 0;
-      rows.querySelectorAll('.order-row').forEach(r => {
+      rows.querySelectorAll('.order-row').forEach(r=>{
         const qty = Number(r.querySelector('input[type=number]').value) || 0;
-        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0; // second number input is price
+        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0; // second is price
         total += qty * price;
       });
       totalPreview.textContent = 'Total: ' + money(total);
     }
 
-    // Save order logic
-    container.querySelector('#saveOrder').addEventListener('click', async () => {
+    // Save order
+    container.querySelector('#saveOrder').addEventListener('click', async ()=>{
       const date = container.querySelector('#orderDate').value || nowDateISO();
       const name = container.querySelector('#orderName').value.trim();
-      if (!name) { alert('Isi nama pelanggan'); return; }
+      if(!name){ alert('Isi nama pelanggan'); return; }
 
-      // build items array
       const orderRows = Array.from(rows.querySelectorAll('.order-row'));
-      if (orderRows.length === 0) { alert('Tambahkan minimal 1 item'); return; }
+      if(orderRows.length === 0){ alert('Tambahkan minimal 1 item'); return; }
 
       const items = [];
       let grand = 0;
-      for (const r of orderRows) {
+      for(const r of orderRows){
         const sel = r.querySelector('select');
         const id = sel.value;
-        if (!id) { alert('Pilih barang pada semua baris'); return; }
+        if(!id){ alert('Pilih barang pada semua baris'); return; }
         const qty = Number(r.querySelector('input[type=number]').value) || 0;
         const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0;
         items.push({ id, qty, price });
         grand += qty * price;
       }
 
-      // Create order doc
       const orderDoc = {
-        date,
-        name,
-        items,
-        grand,
-        payment: 'none',
-        status: 'pending',
-        createdAt: Date.now()
+        date, name, items, grand,
+        payment: 'none', status: 'pending',
+        createdAt: Date.now(),
+        ownerUid: auth.currentUser ? auth.currentUser.uid : null
       };
 
-      try {
-        await addDoc(collection(db, 'orders'), orderDoc);
-        // Optionally: decrement stock for each item (naive approach).
-        // For production prefer transactions to avoid race conditions.
-        for (const it of items) {
-          const itemRef = doc(db, 'items', it.id);
-          // read current stock
+      try{
+        const docRef = await addDoc(collection(db,'orders'), orderDoc);
+        // decrement stock (naive)
+        for(const it of items){
+          const itemRef = doc(db,'items',it.id);
           const s = await getDoc(itemRef);
-          if (s.exists()) {
+          if(s.exists()){
             const cur = s.data();
-            const newStock = Math.max(0, (cur.stock || 0) - it.qty);
+            const newStock = Math.max(0, (cur.stock||0) - it.qty);
             await updateDoc(itemRef, { stock: newStock });
           }
         }
-        alert('Order tersimpan! (tersimpan di Firestore)');
-        // clear
+        alert('Order tersimpan! ID: ' + docRef.id);
+        // clear form
         container.querySelector('#orderName').value = '';
-        rows.innerHTML = '';
-        addRow();
-        updateTotal();
-      } catch (err) {
+        rows.innerHTML = ''; addRow(); updateTotal();
+      }catch(e){ console.error(e); alert('Gagal menyimpan: '+e.message); }
+    });
+
+    // Payment flow
+    container.querySelector('#payBtn').addEventListener('click', async ()=>{
+      // 1) must be authenticated to pay (so we can send ID token)
+      if(!auth.currentUser){
+        if(!confirm('Anda harus login untuk melakukan pembayaran. Login sekarang?')) return;
+        location.hash = '#/admin'; // route to auth/login
+        return;
+      }
+
+      // flow: user picks an existing order to pay. We'll present a simple dialog to ask orderId
+      const orderId = prompt('Masukkan Order ID yang ingin dibayar (contoh: doc id dari Firestore):');
+      if(!orderId) return;
+
+      try{
+        // get current ID token
+        const idToken = await auth.currentUser.getIdToken();
+        // call server endpoint to create PaymentIntent
+        const resp = await fetch((SERVER_ORIGIN||'') + '/api/create-payment-intent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + idToken
+          },
+          body: JSON.stringify({ orderId })
+        });
+        if(!resp.ok){
+          const err = await resp.json().catch(()=>({error:resp.statusText}));
+          throw new Error(err.error || resp.statusText);
+        }
+        const { clientSecret } = await resp.json();
+        if(!clientSecret) throw new Error('server tidak mengembalikan clientSecret');
+
+        // Show payment modal with Stripe Elements
+        openPaymentModal(clientSecret, orderId);
+
+      }catch(err){
         console.error(err);
-        alert('Gagal menyimpan order: ' + err.message);
+        alert('Gagal memulai pembayaran: '+err.message);
       }
     });
 
-    // PAYMENT button stub — this is where you integrate a gateway (Midtrans/Xendit/Stripe etc)
-    container.querySelector('#payBtn').addEventListener('click', () => {
-      alert('Fungsi pembayaran belum terintegrasi. Ini adalah tempat untuk memanggil gateway (server-side) lalu memperbarui order.status = "paid".');
-      // Example flow:
-      // 1) Send order amount to your server -> create payment session
-      // 2) Redirect user to payment URL / or open modal
-      // 3) On success callback, update order doc payment/status
-    });
+    // Stripe payment modal (simple)
+    // We'll create elements on demand and confirm payment with card details.
+    function openPaymentModal(clientSecret, orderId){
+      // build modal if missing
+      let modal = document.getElementById('paymentModal');
+      if(!modal){
+        modal = document.createElement('div');
+        modal.id = 'paymentModal';
+        modal.innerHTML = `<div class="modal"><h3>Bayar Order</h3>
+          <div id="card-element"></div>
+          <div id="card-errors" class="small" style="color:#fca5a5;margin-top:8px"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button id="confirmPay" class="btn">Bayar</button>
+            <button id="closePay" class="btn ghost">Batal</button>
+          </div>
+        </div>`;
+        document.body.appendChild(modal);
+      }
+      modal.style.display = 'flex';
 
-    // allow direct URL anchor to admin when logged in
-    updateTotal();
+      // create elements
+      const elements = stripe.elements();
+      const style = { base: { color: '#e6eef6', fontSize: '16px', '::placeholder': { color: '#9aa6b2' } } };
+      const card = elements.create('card', { style });
+      card.mount('#card-element');
+
+      modal.querySelector('#closePay').onclick = ()=>{
+        modal.style.display = 'none';
+        card.destroy();
+      };
+
+      modal.querySelector('#confirmPay').onclick = async ()=>{
+        modal.querySelector('#card-errors').textContent = 'Memproses...';
+        try{
+          const result = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: { card }
+          });
+          if(result.error){
+            modal.querySelector('#card-errors').textContent = result.error.message;
+          } else if(result.paymentIntent && result.paymentIntent.status === 'succeeded'){
+            modal.querySelector('#card-errors').textContent = 'Pembayaran berhasil!';
+            // Optionally update order status in client (server webhook will also update)
+            try{
+              await updateDoc(doc(db,'orders', orderId), { status: 'paid', payment: { method: 'card', id: result.paymentIntent.id }, paidAt: serverTimestamp() });
+            }catch(e){ console.warn('Tidak dapat update order client-side:', e.message); }
+            setTimeout(()=>{ modal.style.display='none'; card.destroy(); }, 900);
+          }
+        }catch(e){
+          modal.querySelector('#card-errors').textContent = e.message || 'Error';
+        }
+      };
+    }
+
   } // end renderForm
 
-
   /**************************************************************************
-   * AUTH UI (simple register/login) used for admin access
-   * Note: For real app, disable public registration or restrict registrations.
+   * AUTH UI
    **************************************************************************/
-  function renderAuth() {
+  function renderAuth(){
     root.innerHTML = '';
     const div = document.createElement('div');
     div.innerHTML = `
@@ -390,41 +422,30 @@
         <button id="btnLogin" class="btn">Login</button>
         <button id="btnReg" class="btn ghost">Register</button>
       </div>
-      <p class="small muted" style="margin-top:8px">Untuk akses admin: daftar user lalu tandai sebagai admin di Firestore (collection 'admins' doc id = uid) — atau ubah logika sesuai kebutuhan.</p>
+      <p class="small muted" style="margin-top:8px">Registrasi publik diperbolehkan — untuk akses admin, buat doc di collection 'admins' (doc id = uid) atau atur sesuai kebutuhan.</p>
     `;
     root.appendChild(div);
 
-    div.querySelector('#btnLogin').addEventListener('click', async () => {
+    div.querySelector('#btnLogin').addEventListener('click', async ()=>{
       const email = div.querySelector('#email').value;
       const pw = div.querySelector('#pass').value;
-      try {
-        await signInWithEmailAndPassword(auth, email, pw);
-      } catch (e) {
-        alert('Login error: ' + e.message);
-      }
+      try{ await signInWithEmailAndPassword(auth, email, pw); } catch(e){ alert('Login error: '+e.message); }
     });
 
-    div.querySelector('#btnReg').addEventListener('click', async () => {
+    div.querySelector('#btnReg').addEventListener('click', async ()=>{
       const email = div.querySelector('#email').value;
       const pw = div.querySelector('#pass').value;
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pw);
-        // Optionally mark this user as admin by creating doc in 'admins' collection (manually recommended)
+      try{
+        await createUserWithEmailAndPassword(auth, email, pw);
         alert('Terdaftar. Tandai user sebagai admin di Firestore jika diperlukan.');
-      } catch (e) {
-        alert('Register error: ' + e.message);
-      }
+      }catch(e){ alert('Register error: '+e.message); }
     });
   }
 
   /**************************************************************************
    * ADMIN UI
-   * - Live-listening orders
-   * - Search (client-side on cached snapshot)
-   * - Simple pagination (client-side slicing after caching)
-   * - Per-item stock update
    **************************************************************************/
-  function renderAdmin() {
+  function renderAdmin(){
     root.innerHTML = '';
     const container = document.createElement('div');
     container.className = 'grid';
@@ -442,6 +463,10 @@
         <h2>Manajemen Stok</h2>
         <div id="stockArea" class="small muted">Memuat stok…</div>
         <div style="margin-top:10px"><button id="seed" class="btn ghost">Seed items if empty</button></div>
+        <div style="margin-top:12px">
+          <h3>Kelola Admin</h3>
+          <input id="assignUid" placeholder="UID untuk jadikan admin"><button id="btnAssign" class="btn ghost">Assign</button>
+        </div>
       </aside>
     `;
     root.appendChild(container);
@@ -449,82 +474,62 @@
     const ordersArea = container.querySelector('#ordersArea');
     const stockArea = container.querySelector('#stockArea');
 
-    // cache orders locally for search/pagination
-    let ordersCache = [];
-    const perPage = 8;
-    let page = 0;
+    let ordersCache = [], perPage = 8, page = 0;
 
-    // live listen orders collection
-    onSnapshot(collection(db, 'orders'), snap => {
-      ordersCache = [];
-      snap.forEach(d => ordersCache.push({ id: d.id, ...d.data() }));
+    // live listen orders
+    onSnapshot(collection(db,'orders'), snap=>{
+      ordersCache = []; snap.forEach(d=> ordersCache.push({ id: d.id, ...d.data() }) );
       renderOrders();
     });
 
-    // render orders based on search + pagination
-    function renderOrders() {
+    function renderOrders(){
       const q = container.querySelector('#search').value.trim().toLowerCase();
       const fs = container.querySelector('#filterStatus').value;
-      let filtered = ordersCache.filter(o => {
-        if (fs && o.status !== fs) return false;
-        if (!q) return true;
-        if ((o.name || '').toLowerCase().includes(q)) return true;
-        if (o.items && o.items.some(it => (it.id || '').toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q))) return true;
+      let filtered = ordersCache.filter(o=>{
+        if(fs && o.status !== fs) return false;
+        if(!q) return true;
+        if((o.name||'').toLowerCase().includes(q)) return true;
+        if(o.items && o.items.some(it=> (it.id||'').toLowerCase().includes(q) || (it.name||'').toLowerCase().includes(q))) return true;
         return false;
       });
-      const pages = Math.max(1, Math.ceil(filtered.length / perPage));
-      if (page >= pages) page = pages - 1;
-      const start = page * perPage;
-      const slice = filtered.slice(start, start + perPage);
+      const pages = Math.max(1, Math.ceil(filtered.length/perPage));
+      if(page >= pages) page = pages-1;
+      const start = page*perPage;
+      const slice = filtered.slice(start, start+perPage);
 
-      ordersArea.innerHTML = slice.map(o => {
-        const itemsText = (o.items || []).map(it => `${it.id} x${it.qty} @${money(it.price)}`).join(', ');
+      ordersArea.innerHTML = slice.map(o=>{
+        const itemsTxt = (o.items||[]).map(it=>`${it.id} x${it.qty} @ ${money(it.price)}`).join(', ');
         return `<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)">
           <div><strong>${o.name}</strong> <span class="small muted">${o.date} • ${money(o.grand)}</span></div>
-          <div class="small" style="margin-top:6px">${itemsText}</div>
+          <div class="small" style="margin-top:6px">${itemsTxt}</div>
           <div style="margin-top:8px"><button data-id="${o.id}" class="markPaid ok">${o.status==='paid' ? 'Paid' : 'Mark Paid'}</button> <button data-id="${o.id}" class="del danger">Hapus</button></div>
         </div>`;
       }).join('');
 
-      // attach handlers
-      ordersArea.querySelectorAll('.markPaid').forEach(b => {
-        b.addEventListener('click', async (ev) => {
-          const id = ev.target.dataset.id;
-          try {
-            await updateDoc(doc(db, 'orders', id), { status: 'paid' });
-            alert('Order marked paid');
-          } catch (e) { alert('Error: ' + e.message); }
-        });
-      });
-      ordersArea.querySelectorAll('.del').forEach(b => {
-        b.addEventListener('click', async (ev) => {
-          const id = ev.target.dataset.id;
-          if (!confirm('Hapus order ini?')) return;
-          try {
-            // Delete by overwriting with empty object is not ideal; in production use deleteDoc
-            await setDoc(doc(db, 'orders', id), {});
-            alert('Dihapus (cat: set empty object). For real delete, use deleteDoc in production.');
-          } catch (e) { alert('Error: ' + e.message); }
-        });
-      });
+      // handlers
+      ordersArea.querySelectorAll('.markPaid').forEach(b=> b.addEventListener('click', async ev=>{
+        const id = ev.target.dataset.id;
+        try{ await updateDoc(doc(db,'orders',id), { status: 'paid', paidAt: serverTimestamp() }); alert('Marked paid'); } catch(e){ alert('Err: '+e.message); }
+      }));
+      ordersArea.querySelectorAll('.del').forEach(b=> b.addEventListener('click', async ev=>{
+        const id = ev.target.dataset.id;
+        if(!confirm('Hapus order ini?')) return;
+        try{ await deleteDoc(doc(db,'orders',id)); alert('Deleted'); } catch(e){ alert('Err: '+e.message); }
+      }));
     }
 
-    // search & filter listeners
-    container.querySelector('#search').addEventListener('input', () => { page = 0; renderOrders(); });
-    container.querySelector('#filterStatus').addEventListener('change', () => { page = 0; renderOrders(); });
-    container.querySelector('#prev').addEventListener('click', () => { if (page > 0) page--; renderOrders(); });
-    container.querySelector('#next').addEventListener('click', () => { page++; renderOrders(); });
+    container.querySelector('#search').addEventListener('input', ()=>{ page=0; renderOrders(); });
+    container.querySelector('#filterStatus').addEventListener('change', ()=>{ page=0; renderOrders(); });
+    container.querySelector('#prev').addEventListener('click', ()=>{ if(page>0) page--; renderOrders(); });
+    container.querySelector('#next').addEventListener('click', ()=>{ page++; renderOrders(); });
 
-    // Stock management: live snapshot of items
-    onSnapshot(collection(db, 'items'), snap => {
+    // stock management (live)
+    onSnapshot(collection(db,'items'), snap=>{
       stockArea.innerHTML = '';
-      snap.forEach(d => {
+      snap.forEach(d=>{
         const it = d.data();
         const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.justifyContent = 'space-between';
-        row.style.alignItems = 'center';
-        row.style.padding = '8px 0';
+        row.style.display = 'flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='8px 0';
         row.innerHTML = `<div><strong>${it.name}</strong><div class="small muted">${money(it.price)}</div></div>
           <div style="display:flex;gap:8px;align-items:center">
             <input style="width:80px" data-id="${d.id}" value="${it.stock}">
@@ -533,37 +538,33 @@
         stockArea.appendChild(row);
       });
       // save handlers
-      stockArea.querySelectorAll('.saveStock').forEach(b => {
-        b.addEventListener('click', async () => {
-          const id = b.dataset.id;
-          const input = stockArea.querySelector(`input[data-id="${id}"]`);
-          const val = Number(input.value) || 0;
-          try {
-            await updateDoc(doc(db, 'items', id), { stock: val });
-            alert('Stok tersimpan');
-          } catch (e) { alert('Error: ' + e.message); }
-        });
-      });
+      stockArea.querySelectorAll('.saveStock').forEach(b=> b.addEventListener('click', async ()=>{
+        const id = b.dataset.id;
+        const input = stockArea.querySelector(`input[data-id="${id}"]`);
+        const val = Number(input.value) || 0;
+        try{ await updateDoc(doc(db,'items',id), { stock: val }); alert('Stok tersimpan'); } catch(e){ alert('Err: '+e.message); }
+      }));
     });
 
-    // seed button
-    container.querySelector('#seed').addEventListener('click', async () => {
-      await seedItemsIfEmpty();
-      alert('Seed items dipicu');
-    });
-  } // end renderAdmin
+    // seed items
+    container.querySelector('#seed').addEventListener('click', async ()=>{ await seedItemsIfEmpty(); alert('Seed dipicu'); });
 
-  // react to auth state
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      signBtn.style.display = 'inline-block';
-    } else {
-      signBtn.style.display = 'none';
-    }
+    // assign admin UI: write doc to collection 'admins' (docId = uid)
+    container.querySelector('#btnAssign').addEventListener('click', async ()=>{
+      const uid = container.querySelector('#assignUid').value.trim();
+      if(!uid) return alert('Masukkan UID');
+      try{ await setDoc(doc(db,'admins',uid), { role:'admin', assignedAt: serverTimestamp(), assignedBy: auth.currentUser.uid }); alert('Admin assigned'); }
+      catch(e){ alert('Err: '+e.message); }
+    });
+  }
+
+  // react to auth changes
+  onAuthStateChanged(auth, user=>{
+    signBtn.style.display = user ? 'inline-block' : 'none';
     route();
   });
 
-  // initial route
+  // initial render
   route();
 
   </script>
