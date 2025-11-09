@@ -5,51 +5,20 @@
 <title>Form Order + Pembayaran</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- Kalender -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f6f9fc;
-  padding: 20px;
-}
-.container {
-  max-width: 550px;
-  margin: auto;
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-input, select, button {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-button {
-  background: #3b82f6;
-  color: white;
-  cursor: pointer;
-  transition: 0.2s;
-}
-button:hover {
-  background: #2563eb;
-}
-table { width: 100%; margin-top: 8px; }
-td { padding: 4px; }
-.total-box {
-  font-size: 1.3rem;
-  text-align: right;
-  margin-top: 12px;
-  font-weight: bold;
-}
+body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
+.container { max-width: 550px; margin:auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+input, select, button { width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid #ccc; }
+button { background:#3b82f6; color:white; cursor:pointer; transition:0.2s; }
+button:hover { background:#2563eb; }
+table { width:100%; margin-top:8px; }
+td { padding:4px; }
+.total-box { font-size:1.3rem; text-align:right; margin-top:12px; font-weight:bold; }
 </style>
 </head>
-
 <body>
 <div class="container">
 
@@ -102,32 +71,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ Kalender aktif
+// Kalender
 flatpickr("#date", { dateFormat: "Y-m-d" });
 
-// Ambil data stok dari Firebase
+// Load stok barang dari Firebase
 let stokBarang = [];
 async function loadStok(){
   const snapshot = await getDocs(collection(db, "stok"));
   stokBarang = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-// ✅ Tambah row item dengan dropdown
+// Tambah row item
 const itemsBody = document.getElementById("items-body");
 
-function addItemRow(){
-  const tr = document.createElement("tr");
-
-  // Dropdown nama barang
+function createItemOptions(){
   let options = `<option value="">Pilih barang</option>`;
   stokBarang.forEach(s => {
     options += `<option value="${s.id}" data-price="${s.price}">${s.name}</option>`;
   });
+  return options;
+}
 
+function addItemRow(){
+  const tr = document.createElement("tr");
   tr.innerHTML = `
     <td>
       <select class="item-name">
-        ${options}
+        ${createItemOptions()}
       </select>
     </td>
     <td><input class="item-qty" type="number" value="1" min="1"></td>
@@ -135,13 +105,12 @@ function addItemRow(){
   `;
   itemsBody.appendChild(tr);
 
-  // Auto set harga saat pilih barang
   const selectEl = tr.querySelector(".item-name");
   const priceEl = tr.querySelector(".item-price");
+
   selectEl.onchange = () => {
     const selected = selectEl.options[selectEl.selectedIndex];
-    const price = selected.dataset.price || 0;
-    priceEl.value = price;
+    priceEl.value = selected.dataset.price || 0;
     updateTotal();
   };
 
@@ -151,9 +120,9 @@ function addItemRow(){
 
 document.getElementById("add-item").onclick = addItemRow;
 
-// ✅ Hitung total
+// Hitung total
 function updateTotal(){
-  let t=0;
+  let t = 0;
   document.querySelectorAll("#items-body tr").forEach(tr=>{
     const q = Number(tr.querySelector(".item-qty").value);
     const p = Number(tr.querySelector(".item-price").value);
@@ -162,14 +131,13 @@ function updateTotal(){
   document.getElementById("grand").textContent = t.toLocaleString();
 }
 
-// ✅ Simpan order
+// Simpan order
 let currentOrderId=null;
-
 document.getElementById("saveOrder").onclick = async ()=>{
   const name = document.getElementById("name").value;
   const date = document.getElementById("date").value;
   const items = [];
-  let grand=0;
+  let grand = 0;
 
   document.querySelectorAll("#items-body tr").forEach(tr=>{
     const sel = tr.querySelector(".item-name");
@@ -194,7 +162,6 @@ document.getElementById("saveOrder").onclick = async ()=>{
   alert("✅ Order tersimpan!");
 };
 
-// ✅ Tombol bayar sekarang
 document.getElementById("payButton").onclick = ()=>{
   if(!currentOrderId){
     alert("Order belum disimpan!");
@@ -205,11 +172,10 @@ document.getElementById("payButton").onclick = ()=>{
   window.location.href = "order_pay.html";
 };
 
-// Load stok sebelum add row pertama
+// Load stok terlebih dahulu sebelum add row pertama
 await loadStok();
 addItemRow();
 
 </script>
-
 </body>
 </html>
