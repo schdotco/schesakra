@@ -6,7 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; color:#1f2937; }
-h2 { text-align:center; margin-bottom:20px; }
+h2 { text-align:center; margin-bottom:10px; }
+.button-back {
+  display:block;
+  margin: 0 auto 20px auto;
+  background:#3b82f6; color:white; border:none; padding:10px 16px;
+  border-radius:8px; cursor:pointer; font-size:14px; transition:0.2s;
+}
+.button-back:hover { background:#2563eb; }
 .table-box {
   background:white; padding:20px; border-radius:12px;
   box-shadow:0 4px 12px rgba(0,0,0,0.1);
@@ -21,6 +28,9 @@ th { background:#f3f4f6; }
 <body>
 
 <h2>Rekapitulasi Pesanan Terkonfirmasi</h2>
+
+<!-- Tombol Kembali -->
+<button class="button-back" onclick="goBack()">← Kembali ke Daftar Order</button>
 
 <div class="table-box">
 <table>
@@ -66,13 +76,13 @@ const grandTotalEl = document.getElementById("grandTotal");
 
 async function loadRekap() {
   const snapshot = await getDocs(collection(db, "orders"));
-  const itemsMap = {}; // key = item name, value = {qty, total}
+  const itemsMap = {};
   let grandTotal = 0;
   let grandQty = 0;
 
   snapshot.forEach(doc => {
     const data = doc.data();
-    if(data.status === "confirmed") { // <== hanya ambil status "confirmed"
+    if(data.status === "confirmed") {
       data.items.forEach(item => {
         if(!itemsMap[item.nm]){
           itemsMap[item.nm] = {qty:0, total:0};
@@ -108,6 +118,11 @@ async function loadRekap() {
 }
 
 loadRekap();
+
+// Fungsi tombol kembali
+function goBack(){
+  window.location.href = "order_list.html";
+}
 </script>
 
 </body>
