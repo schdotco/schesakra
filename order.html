@@ -86,7 +86,7 @@ Total: Rp <span id="grand">0</span>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc } 
+import { getFirestore, collection, addDoc, getDocs } 
 from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -105,24 +105,51 @@ const db = getFirestore(app);
 // ✅ Kalender aktif
 flatpickr("#date", { dateFormat: "Y-m-d" });
 
-// ✅ Tambah row item
+// Ambil data stok dari Firebase
+let stokBarang = [];
+async function loadStok(){
+  const snapshot = await getDocs(collection(db, "stok"));
+  stokBarang = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+// ✅ Tambah row item dengan dropdown
 const itemsBody = document.getElementById("items-body");
 
 function addItemRow(){
   const tr = document.createElement("tr");
+
+  // Dropdown nama barang
+  let options = `<option value="">Pilih barang</option>`;
+  stokBarang.forEach(s => {
+    options += `<option value="${s.id}" data-price="${s.price}">${s.name}</option>`;
+  });
+
   tr.innerHTML = `
-    <td><input class="item-name" placeholder="Nama barang"></td>
+    <td>
+      <select class="item-name">
+        ${options}
+      </select>
+    </td>
     <td><input class="item-qty" type="number" value="1" min="1"></td>
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
   itemsBody.appendChild(tr);
+
+  // Auto set harga saat pilih barang
+  const selectEl = tr.querySelector(".item-name");
+  const priceEl = tr.querySelector(".item-price");
+  selectEl.onchange = () => {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    const price = selected.dataset.price || 0;
+    priceEl.value = price;
+    updateTotal();
+  };
 
   tr.querySelector(".item-qty").oninput = updateTotal;
   tr.querySelector(".item-price").oninput = updateTotal;
 }
 
 document.getElementById("add-item").onclick = addItemRow;
-addItemRow(); // pertama kali
 
 // ✅ Hitung total
 function updateTotal(){
@@ -139,28 +166,36 @@ function updateTotal(){
 let currentOrderId=null;
 
 document.getElementById("saveOrder").onclick = async ()=>{
-  const name=document.getElementById("name").value;
-  const date=document.getElementById("date").value;
-  const items=[];
+  const name = document.getElementById("name").value;
+  const date = document.getElementById("date").value;
+  const items = [];
   let grand=0;
 
   document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const nm=tr.querySelector(".item-name").value;
-    const q=Number(tr.querySelector(".item-qty").value);
-    const p=Number(tr.querySelector(".item-price").value);
-    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+    const sel = tr.querySelector(".item-name");
+    const itemId = sel.value;
+    const itemName = sel.options[sel.selectedIndex].text;
+    const q = Number(tr.querySelector(".item-qty").value);
+    const p = Number(tr.querySelector(".item-price").value);
+    if(itemId && q>0 && p>0){
+      items.push({ id:itemId, nm:itemName, q, p });
+      grand += q*p;
+    }
   });
 
-  const docRef=await addDoc(collection(db,"orders"),{
-    name,date,items,grand,status:"unpaid"
+  if(!name || !date || items.length==0) return alert("Lengkapi data order!");
+
+  const docRef = await addDoc(collection(db,"orders"),{
+    name, date, items, grand, status:"unpaid"
   });
 
-  currentOrderId=docRef.id;
+  currentOrderId = docRef.id;
   document.getElementById("payButton").style.display="block";
   alert("✅ Order tersimpan!");
 };
 
-  document.getElementById("payButton").onclick = ()=>{
+// ✅ Tombol bayar sekarang
+document.getElementById("payButton").onclick = ()=>{
   if(!currentOrderId){
     alert("Order belum disimpan!");
     return;
@@ -169,6 +204,10 @@ document.getElementById("saveOrder").onclick = async ()=>{
   localStorage.setItem("selectedOrderId", currentOrderId);
   window.location.href = "order_pay.html";
 };
+
+// Load stok sebelum add row pertama
+await loadStok();
+addItemRow();
 
 </script>
 
