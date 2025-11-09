@@ -54,12 +54,25 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const ordersBody = document.getElementById("orders");
+const startDateInput = document.getElementById("startDate");
+const endDateInput = document.getElementById("endDate");
+
+let allOrders = []; // Menyimpan semua order
 
 // Real-time listener
-onSnapshot(collection(db, "orders"), snapshot=>{
-  ordersBody.innerHTML = "";
-  snapshot.forEach(docSnap=>{
+onSnapshot(collection(db, "orders"), snapshot => {
+  allOrders = [];
+  snapshot.forEach(docSnap => {
     const d = docSnap.data();
+    allOrders.push({ id: docSnap.id, ...d });
+  });
+  applyDateFilter(); // Render langsung saat data diperbarui
+});
+
+// Fungsi render tabel
+function renderOrders(orders) {
+  ordersBody.innerHTML = "";
+  orders.forEach(d => {
     const tr = document.createElement("tr");
     tr.classList.add("order-row");
 
@@ -69,46 +82,70 @@ onSnapshot(collection(db, "orders"), snapshot=>{
       <td>Rp ${d.grand.toLocaleString()}</td>
       <td class="status-${d.status}">${d.status.toUpperCase()}</td>
       <td>
-        <button class="action-btn" onclick="confirmOrder('${docSnap.id}')">Konfirmasi</button>
-        <button class="action-btn" onclick="markPaid('${docSnap.id}')">Sudah Bayar</button>
+        <button class="action-btn" onclick="confirmOrder('${d.id}')">Konfirmasi</button>
+        <button class="action-btn" onclick="markPaid('${d.id}')">Sudah Bayar</button>
       </td>
     `;
 
-    tr.onclick = (e)=>{
-      if(e.target.tagName !== "BUTTON"){
-        localStorage.setItem("selectedOrderId", docSnap.id);
+    tr.onclick = (e) => {
+      if (e.target.tagName !== "BUTTON") {
+        localStorage.setItem("selectedOrderId", d.id);
         window.location.href = "order_pay.html";
       }
-    }
+    };
 
     ordersBody.appendChild(tr);
   });
-});
+}
 
 // Update status menjadi "confirmed"
-window.confirmOrder = async (id)=>{
+window.confirmOrder = async (id) => {
   const docRef = doc(db, "orders", id);
-  await updateDoc(docRef, { status:"confirmed" });
+  await updateDoc(docRef, { status: "confirmed" });
   alert("✅ Order dikonfirmasi!");
 };
 
 // Update status menjadi "paid"
-window.markPaid = async (id)=>{
+window.markPaid = async (id) => {
   const docRef = doc(db, "orders", id);
-  await updateDoc(docRef, { status:"paid" });
+  await updateDoc(docRef, { status: "paid" });
   alert("✅ Status dibayar!");
 };
 
 // Tombol rekap
-window.gotoRekap = ()=>{
+window.gotoRekap = () => {
   window.location.href = "rekaporder.html";
 };
+
+// Filter otomatis berdasarkan tanggal
+window.applyDateFilter = () => {
+  const start = startDateInput.value;
+  const end = endDateInput.value;
+
+  if (!start || !end) {
+    renderOrders(allOrders); // Jika belum pilih tanggal, tampilkan semua
+    return;
+  }
+
+  const filtered = allOrders.filter(o => o.date >= start && o.date <= end);
+  renderOrders(filtered);
+};
+
+// Event listener otomatis saat tanggal berubah
+startDateInput.addEventListener("change", applyDateFilter);
+endDateInput.addEventListener("change", applyDateFilter);
 </script>
 </head>
 
 <body>
 
 <h2>Menu Admin - Daftar Order</h2>
+
+<!-- Filter tanggal -->
+<div style="text-align:center; margin-bottom:12px;">
+  <label>Dari: <input type="date" id="startDate"></label>
+  <label>Sampai: <input type="date" id="endDate"></label>
+</div>
 
 <!-- Tombol menuju rekap pesanan -->
 <button class="rekap-btn" onclick="gotoRekap()">Lihat Rekap Pesanan</button>
