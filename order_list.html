@@ -6,33 +6,153 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { font-family: Arial, sans-serif; background:#f0f4f8; padding:12px; margin:0; }
-h2 { text-align:center; color:#1f2937; margin-bottom:10px; }
-.table-box {
-  background:white; padding:16px; border-radius:12px;
-  box-shadow:0 4px 16px rgba(0,0,0,0.12);
-  overflow-x:auto;
+/* ===== BODY & LAYOUT ===== */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f4f6f8;
+  margin: 0;
+  padding: 20px;
+  color: #1f2937;
 }
-table { width:100%; border-collapse: collapse; font-size:14px; }
-th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
-th { background:#f3f4f6; font-weight:600; }
-.order-row:hover { background:#e0ebff; cursor:pointer; }
-.status-unpaid { color:#d00000; font-weight:bold; }
-.status-paid { color:#007b1c; font-weight:bold; }
+
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+}
+
+/* ===== FILTER & BUTTONS ===== */
+.filter-box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter-box label {
+  font-weight: 500;
+}
+
+.filter-box input[type="date"] {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  outline: none;
+  font-size: 14px;
+}
+
 button.action-btn {
-  background:#3b82f6; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;
-  font-size:13px; margin-right:4px; transition:0.2s;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.2s;
 }
-button.action-btn:hover { background:#2563eb; }
+
+button.action-btn:hover {
+  background: #2563eb;
+}
+
 button.rekap-btn {
-  background:#10b981; color:white; border:none; padding:8px 14px; border-radius:8px; cursor:pointer;
-  font-size:14px; margin-bottom:12px; transition:0.2s; display:block; margin-left:auto; margin-right:auto;
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 0 auto 20px auto;
+  display: block;
+  transition: 0.2s;
 }
-button.rekap-btn:hover { background:#059669; }
-@media (max-width:480px){
-  table, th, td { font-size:12px; }
-  button.action-btn { padding:4px 8px; font-size:12px; }
-  button.rekap-btn { padding:6px 12px; font-size:13px; }
+
+button.rekap-btn:hover {
+  background: #059669;
+}
+
+/* ===== TABLE ===== */
+.table-box {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 600px;
+}
+
+th, td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #334155;
+}
+
+.order-row:hover {
+  background: #e0ebff;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.status-unpaid {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.status-paid {
+  color: #059669;
+  font-weight: bold;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  table, th, td {
+    font-size: 13px;
+  }
+
+  .filter-box {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  button.action-btn {
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+
+  button.rekap-btn {
+    padding: 8px 14px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  table, th, td {
+    font-size: 12px;
+  }
+
+  .filter-box input[type="date"] {
+    width: 100%;
+  }
+
+  button.action-btn {
+    width: 100%;
+    margin-bottom: 5px;
+  }
 }
 </style>
 
@@ -57,7 +177,7 @@ const ordersBody = document.getElementById("orders");
 const startDateInput = document.getElementById("startDate");
 const endDateInput = document.getElementById("endDate");
 
-let allOrders = []; // Menyimpan semua order
+let allOrders = [];
 
 // Real-time listener
 onSnapshot(collection(db, "orders"), snapshot => {
@@ -66,12 +186,17 @@ onSnapshot(collection(db, "orders"), snapshot => {
     const d = docSnap.data();
     allOrders.push({ id: docSnap.id, ...d });
   });
-  applyDateFilter(); // Render langsung saat data diperbarui
+  applyDateFilter();
 });
 
 // Fungsi render tabel
 function renderOrders(orders) {
   ordersBody.innerHTML = "";
+  if(orders.length === 0){
+    ordersBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b;">Tidak ada order ditemukan</td></tr>`;
+    return;
+  }
+
   orders.forEach(d => {
     const tr = document.createElement("tr");
     tr.classList.add("order-row");
@@ -98,32 +223,31 @@ function renderOrders(orders) {
   });
 }
 
-// Update status menjadi "confirmed"
+// Update status
 window.confirmOrder = async (id) => {
   const docRef = doc(db, "orders", id);
   await updateDoc(docRef, { status: "confirmed" });
   alert("✅ Order dikonfirmasi!");
 };
 
-// Update status menjadi "paid"
 window.markPaid = async (id) => {
   const docRef = doc(db, "orders", id);
   await updateDoc(docRef, { status: "paid" });
   alert("✅ Status dibayar!");
 };
 
-// Tombol rekap
+// Rekap tombol
 window.gotoRekap = () => {
   window.location.href = "rekaporder.html";
 };
 
-// Filter otomatis berdasarkan tanggal
+// Filter otomatis
 window.applyDateFilter = () => {
   const start = startDateInput.value;
   const end = endDateInput.value;
 
   if (!start || !end) {
-    renderOrders(allOrders); // Jika belum pilih tanggal, tampilkan semua
+    renderOrders(allOrders);
     return;
   }
 
@@ -131,7 +255,6 @@ window.applyDateFilter = () => {
   renderOrders(filtered);
 };
 
-// Event listener otomatis saat tanggal berubah
 startDateInput.addEventListener("change", applyDateFilter);
 endDateInput.addEventListener("change", applyDateFilter);
 </script>
@@ -141,15 +264,16 @@ endDateInput.addEventListener("change", applyDateFilter);
 
 <h2>Menu Admin - Daftar Order</h2>
 
-<!-- Filter tanggal -->
-<div style="text-align:center; margin-bottom:12px;">
+<!-- Filter Tanggal -->
+<div class="filter-box">
   <label>Dari: <input type="date" id="startDate"></label>
   <label>Sampai: <input type="date" id="endDate"></label>
 </div>
 
-<!-- Tombol menuju rekap pesanan -->
+<!-- Tombol Rekap -->
 <button class="rekap-btn" onclick="gotoRekap()">Lihat Rekap Pesanan</button>
 
+<!-- Tabel Order -->
 <div class="table-box">
 <table>
 <thead>
