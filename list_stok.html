@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Daftar Stok Barang</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial; background:#f6f9fc; padding:20px; }
+.container { max-width: 600px; margin:auto; }
+input, button { width: 100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid #ccc; }
+button { background:#3b82f6; color:white; cursor:pointer; border:none; transition:0.2s; }
+button:hover { background:#2563eb; }
+ul { padding-left: 20px; }
+li { margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<h2>Daftar Stok Barang</h2>
+
+<label>Nama Barang</label>
+<input id="stokName" placeholder="Masukkan nama barang">
+
+<button id="addStok">Tambah Stok</button>
+
+<h3>List Stok Barang</h3>
+<ul id="stokList">Memuat...</ul>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const stokListEl = document.getElementById("stokList");
+
+// Load stok barang
+async function loadStok(){
+  const snapshot = await getDocs(collection(db, "stok"));
+  stokListEl.innerHTML = "";
+  if(snapshot.empty){
+    stokListEl.innerHTML = "<li>Tidak ada stok barang.</li>";
+    return;
+  }
+  snapshot.docs.forEach(docSnap => {
+    const data = docSnap.data();
+    const li = document.createElement("li");
+    li.textContent = data.name;
+    stokListEl.appendChild(li);
+  });
+}
+
+// Tambah stok
+document.getElementById("addStok").onclick = async () => {
+  const name = document.getElementById("stokName").value.trim();
+  if(!name) return alert("Masukkan nama barang!");
+
+  await addDoc(collection(db, "stok"), { name });
+  document.getElementById("stokName").value = "";
+  await loadStok();
+};
+
+loadStok();
+</script>
+
+</body>
+</html>
