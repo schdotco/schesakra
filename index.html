@@ -123,17 +123,33 @@ function updateTotal(){
 let currentOrderId=null;
 
 document.getElementById("saveOrder").onclick = async ()=>{
-  const name=document.getElementById("name").value;
-  const date=document.getElementById("date").value;
-  const items=[];
-  let grand=0;
+  try {
+    const name=document.getElementById("name").value;
+    const date=document.getElementById("date").value;
+    const items=[];
+    let grand=0;
 
-  document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const nm=tr.querySelector(".item-name").value;
-    const q=Number(tr.querySelector(".item-qty").value);
-    const p=Number(tr.querySelector(".item-price").value);
-    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
-  });
+    document.querySelectorAll("#items-body tr").forEach(tr=>{
+      const nm=tr.querySelector(".item-name").value;
+      const q=Number(tr.querySelector(".item-qty").value);
+      const p=Number(tr.querySelector(".item-price").value);
+      if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+    });
+
+    const docRef = await addDoc(collection(db,"orders"),{
+      name,date,items,grand,status:"unpaid"
+    });
+
+    currentOrderId=docRef.id;
+    document.getElementById("payButton").style.display="block";
+    alert("✅ Order tersimpan!");
+
+  } catch(e){
+    console.error("❌ ERROR SAVE:", e);
+    alert("Gagal menyimpan! Cek console!");
+  }
+};
+
 
   const docRef = await addDoc(collection(db,"orders"),{
     name,date,items,grand,status:"unpaid"
