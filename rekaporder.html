@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Rekapitulasi Pesanan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; color:#1f2937; }
+h2 { text-align:center; margin-bottom:20px; }
+.table-box {
+  background:white; padding:20px; border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  overflow-x:auto;
+}
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+th, td { border:1px solid #ddd; padding:10px; text-align:left; }
+th { background:#f3f4f6; }
+.total-row { font-weight:bold; background:#e5e7eb; }
+</style>
+</head>
+<body>
+
+<h2>Rekapitulasi Pesanan Terkonfirmasi</h2>
+
+<div class="table-box">
+<table>
+<thead>
+<tr>
+  <th>Nama Item</th>
+  <th>Total Qty</th>
+  <th>Total Harga</th>
+</tr>
+</thead>
+<tbody id="rekapBody">
+<tr><td colspan="3">Memuat data...</td></tr>
+</tbody>
+<tfoot>
+<tr class="total-row">
+  <td>Total Keseluruhan</td>
+  <td id="grandQty">0</td>
+  <td id="grandTotal">Rp 0</td>
+</tr>
+</tfoot>
+</table>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const rekapBody = document.getElementById("rekapBody");
+const grandQtyEl = document.getElementById("grandQty");
+const grandTotalEl = document.getElementById("grandTotal");
+
+async function loadRekap() {
+  const snapshot = await getDocs(collection(db, "orders"));
+  const itemsMap = {}; // key = item name, value = {qty, total}
+  let grandTotal = 0;
+  let grandQty = 0;
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if(data.status === "confirmed") { // <== hanya ambil status "confirmed"
+      data.items.forEach(item => {
+        if(!itemsMap[item.nm]){
+          itemsMap[item.nm] = {qty:0, total:0};
+        }
+        itemsMap[item.nm].qty += item.q;
+        itemsMap[item.nm].total += item.q * item.p;
+        grandQty += item.q;
+        grandTotal += item.q * item.p;
+      });
+    }
+  });
+
+  rekapBody.innerHTML = "";
+  if(Object.keys(itemsMap).length === 0){
+    rekapBody.innerHTML = `<tr><td colspan="3">Belum ada pesanan yang dikonfirmasi.</td></tr>`;
+    grandQtyEl.textContent = "0";
+    grandTotalEl.textContent = "Rp 0";
+    return;
+  }
+
+  for(const [name, info] of Object.entries(itemsMap)){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${name}</td>
+      <td>${info.qty}</td>
+      <td>Rp ${info.total.toLocaleString()}</td>
+    `;
+    rekapBody.appendChild(tr);
+  }
+
+  grandQtyEl.textContent = grandQty;
+  grandTotalEl.textContent = "Rp " + grandTotal.toLocaleString();
+}
+
+loadRekap();
+</script>
+
+</body>
+</html>
