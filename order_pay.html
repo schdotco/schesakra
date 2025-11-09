@@ -2,150 +2,62 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Pembayaran Pesanan</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Stripe.js -->
-  <script src="https://js.stripe.com/v3/"></script>
-
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-
-    // Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
-      authDomain: "schesakra.firebaseapp.com",
-      projectId: "schesakra",
-      storageBucket: "schesakra.firebasestorage.app",
-      messagingSenderId: "672537227977",
-      appId: "1:672537227977:web:88b24f905c86eba7c05318",
-      measurementId: "G-Q7HSM1LK98"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth();
-
-    let stripe;
-
-    // Ambil orderId dari URL
-    const params = new URLSearchParams(window.location.search);
-    const orderId = params.get("orderId");
-    if (!orderId) alert("orderId tidak ditemukan di URL.");
-
-    // Pasang Stripe (gunakan key publishable)
-    const STRIPE_PUBLISHABLE_KEY = "pk_test_REPLACE_WITH_YOURS"; // Ganti dari dashboard
-    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-
-    const payBtn = document.getElementById("payBtn");
-    const statusBox = document.getElementById("status");
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        alert("Anda harus login dulu.");
-        window.location.href = "login.html";
-        return;
-      }
-
-      // Ketika user klik PAY
-      payBtn.onclick = async () => {
-        statusBox.innerText = "Membuat Payment Intent...";
-
-        const token = await getIdToken(user, true);
-
-        // Request ke backend: /api/create-payment-intent
-        const res = await fetch("/api/create-payment-intent", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({ orderId })
-        });
-
-        const data = await res.json();
-
-        if (data.error) {
-          statusBox.innerText = "Error: " + data.error;
-          return;
-        }
-
-        const clientSecret = data.clientSecret;
-
-        // Stripe popup
-        statusBox.innerText = "Membuka halaman pembayaran...";
-        const result = await stripe.confirmCardPayment(clientSecret, {
-          payment_method: {
-            card: {
-              // Akan otomatis render UI di sini:
-            }
-          }
-        });
-
-        if (result.error) {
-          statusBox.innerText = "Pembayaran gagal: " + result.error.message;
-        } else {
-          if (result.paymentIntent.status === "succeeded") {
-            statusBox.innerText = "✅ Pembayaran berhasil!";
-
-            // Redirect ke halaman sukses (opsional)
-            setTimeout(() => {
-              window.location.href = "order_success.html?orderId=" + orderId;
-            }, 1500);
-          }
-        }
-      };
-    });
-  </script>
-
+  <title>Konfirmasi Pembayaran</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #fafafa;
-      padding: 40px;
-      max-width: 450px;
-      margin: auto;
-    }
-    #container {
-      padding: 20px;
-      border: 1px solid #aaa;
-      background: white;
-      border-radius: 8px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background: #007bff;
-      color: white;
-      border: none;
-      font-size: 16px;
-      border-radius: 6px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056c4;
-    }
-    #status {
-      margin-top: 12px;
-      color: #333;
-    }
+    body { font-family: Arial; margin: 20px; }
+    .box { border:1px solid #ddd; padding:20px; border-radius:10px; }
   </style>
 </head>
 <body>
 
-<div id="container">
-  <h2>Pembayaran Pesanan</h2>
-  <p>Order ID: <b id="orderIdBox"></b></p>
+<h2>Konfirmasi Pembayaran</h2>
 
-  <button id="payBtn">Bayar Sekarang</button>
-  <p id="status"></p>
+<div class="box">
+  <p><b>Silakan transfer ke rekening berikut:</b></p>
+  <p><b>Bank:</b> BCA</p>
+  <p><b>No Rekening:</b> 1234567890</p>
+  <p><b>Atas Nama:</b> UPTD Puskesmas Padasuka</p>
+</div>
+
+<br>
+
+<div class="box">
+  <h3>Upload Bukti Transfer:</h3>
+  <input type="file" id="proofFile"><br><br>
+  <button id="uploadBtn">Upload Bukti</button>
 </div>
 
 <script>
-  // Tampilkan orderId di UI
-  document.getElementById("orderIdBox").innerText = new URLSearchParams(window.location.search).get("orderId");
+  // Init Firebase
+  const firebaseConfig = YOUR_FIREBASE_CONFIG;
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  const orderId = new URLSearchParams(window.location.search).get("id");
+
+  document.getElementById("uploadBtn").onclick = async () => {
+    const file = document.getElementById("proofFile").files[0];
+    if (!file) return alert("Pilih gambar dulu");
+
+    const ref = storage.ref(`payment_proofs/${orderId}.jpg`);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+
+    await db.collection("orders").doc(orderId).update({
+      paymentProofUrl: url,
+      status: "waiting_verification"
+    });
+
+    alert("Bukti pembayaran berhasil diupload! Menunggu konfirmasi admin.");
+    window.location = "order_success.html";
+  }
 </script>
 
 </body>
