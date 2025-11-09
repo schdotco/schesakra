@@ -109,14 +109,15 @@ const db = getFirestore(app);
 
 const productGrid = document.getElementById("productGrid");
 
-// Fungsi untuk konversi Google Drive link menjadi direct link
-function convertDriveLink(url) {
+// Fungsi untuk konversi Google Drive link menjadi direct link dan resize
+function convertDriveLink(url, width=150, height=150) {
   try {
     if (!url) return url;
     const regex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/view/;
     const match = url.match(regex);
     if (match && match[1]) {
-      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+      // Tambahkan parameter size untuk resize otomatis
+      return `https://drive.google.com/uc?export=view&id=${match[1]}&w=${width}&h=${height}`;
     }
     return url; // Jika bukan Google Drive, tetap pakai url asli
   } catch {
@@ -143,8 +144,8 @@ async function loadProducts() {
       // Default image jika tidak ada imageUrl
       let imageUrl = data.imageUrl || "https://via.placeholder.com/150x150?text=No+Image";
 
-      // Jika link dari Google Drive, convert menjadi direct link
-      imageUrl = convertDriveLink(imageUrl);
+      // Jika link dari Google Drive, convert menjadi direct link + resize
+      imageUrl = convertDriveLink(imageUrl, 150, 150);
 
       card.innerHTML = `
         <img src="${imageUrl}" alt="${data.name}">
