@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Verifikasi Pembayaran</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+</head>
+<body style="font-family: Arial; padding:20px;">
+
+<h2>Verifikasi Pembayaran</h2>
+<div id="orderList"></div>
+
+<script>
+  const firebaseConfig = YOUR_FIREBASE_CONFIG;
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  auth.onAuthStateChanged(async user => {
+    if (!user) return location.href = "login.html";
+
+    // cek role admin
+    const adminCheck = await db.collection("admins").doc(user.uid).get();
+    if (!adminCheck.exists) return document.body.innerHTML = "<h3>Bukan Admin</h3>";
+
+    db.collection("orders")
+      .where("status", "==", "waiting_verification")
+      .onSnapshot(snap => {
+        let html = "";
+        snap.forEach(doc => {
+          let o = doc.data();
+          html += `
+            <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
+              <p><b>Order:</b> ${doc.id}</p>
+              <p><b>Total:</b> Rp ${o.total}</p>
+              <p><b>Bukti:</b><br><img src="${o.paymentProofUrl}" width="200"></p>
+              <button onclick="verify('${doc.id}')">Tandai Lunas</button>
+            </div>
+          `;
+        });
+        document.getElementById("orderList").innerHTML = html;
+      });
+  });
+
+  async function verify(id){
+    await db.collection("orders").doc(id).update({ status: "paid" });
+    alert("Order ditandai lunas.");
+  }
+</script>
+
+</body>
+</html>
