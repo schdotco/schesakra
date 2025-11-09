@@ -21,6 +21,9 @@ li { margin-bottom:6px; }
 <label>Nama Barang</label>
 <input id="stokName" placeholder="Masukkan nama barang">
 
+<label>Harga (Rp)</label>
+<input id="stokPrice" type="number" placeholder="Masukkan harga barang">
+
 <button id="addStok">Tambah Stok</button>
 
 <h3>List Stok Barang</h3>
@@ -55,7 +58,7 @@ async function loadStok(){
   snapshot.docs.forEach(docSnap => {
     const data = docSnap.data();
     const li = document.createElement("li");
-    li.textContent = data.name;
+    li.textContent = `${data.name} - Rp ${Number(data.price).toLocaleString()}`;
     stokListEl.appendChild(li);
   });
 }
@@ -63,10 +66,13 @@ async function loadStok(){
 // Tambah stok
 document.getElementById("addStok").onclick = async () => {
   const name = document.getElementById("stokName").value.trim();
+  const price = Number(document.getElementById("stokPrice").value);
   if(!name) return alert("Masukkan nama barang!");
+  if(!price || price <= 0) return alert("Masukkan harga yang valid!");
 
-  await addDoc(collection(db, "stok"), { name });
+  await addDoc(collection(db, "stok"), { name, price });
   document.getElementById("stokName").value = "";
+  document.getElementById("stokPrice").value = "";
   await loadStok();
 };
 
