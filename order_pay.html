@@ -3,13 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <title>Konfirmasi Pembayaran</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js"></script>
+
   <style>
-    body { font-family: Arial; margin: 20px; }
-    .box { border:1px solid #ddd; padding:20px; border-radius:10px; }
+    body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
+    .box { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:20px; }
+    button {
+      background:#3b82f6; color:white; border:none; padding:12px;
+      width:100%; border-radius:8px; cursor:pointer; font-size:16px;
+    }
+    button:hover { background:#2563eb; }
   </style>
 </head>
 <body>
@@ -17,47 +25,76 @@
 <h2>Konfirmasi Pembayaran</h2>
 
 <div class="box">
-  <p><b>Silakan transfer ke rekening berikut:</b></p>
-  <p><b>Bank:</b> BCA</p>
-  <p><b>No Rekening:</b> 1234567890</p>
-  <p><b>Atas Nama:</b> UPTD Puskesmas Padasuka</p>
+  <b>Silakan transfer ke rekening berikut:</b><br><br>
+  <b>Bank:</b> BCA<br>
+  <b>No Rekening:</b> 1234567890<br>
+  <b>Atas Nama:</b> UPTD Puskesmas Padasuka
 </div>
-
-<br>
 
 <div class="box">
-  <h3>Upload Bukti Transfer:</h3>
+  <h3>Upload Bukti Transfer</h3>
   <input type="file" id="proofFile"><br><br>
-  <button id="uploadBtn">Upload Bukti</button>
+  <button id="uploadBtn">Upload Bukti & Selesaikan Pembayaran</button>
 </div>
 
-<script>
-  // Init Firebase
-  const firebaseConfig = YOUR_FIREBASE_CONFIG;
-  firebase.initializeApp(firebaseConfig);
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, doc, getDoc, updateDoc } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js";
 
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  const storage = firebase.storage();
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
 
-  const orderId = new URLSearchParams(window.location.search).get("id");
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-  document.getElementById("uploadBtn").onclick = async () => {
-    const file = document.getElementById("proofFile").files[0];
-    if (!file) return alert("Pilih gambar dulu");
+// Ambil orderId
+const orderId = localStorage.getItem("selectedOrderId");
 
-    const ref = storage.ref(`payment_proofs/${orderId}.jpg`);
-    await ref.put(file);
-    const url = await ref.getDownloadURL();
+// Ambil info order & tampilkan ringkasnya
+const docRef = doc(db, "orders", orderId);
+const snapshot = await getDoc(docRef);
+if(snapshot.exists()){
+  const data = snapshot.data();
+  alert(`ORDER DITEMUKAN ✅
+Nama: ${data.name}
+Tanggal: ${data.date}
+Total: Rp ${data.grand.toLocaleString()}
+Status Saat Ini: ${data.status}`);
+} else {
+  alert("❌ Order tidak ditemukan!");
+}
 
-    await db.collection("orders").doc(orderId).update({
-      paymentProofUrl: url,
-      status: "waiting_verification"
-    });
+// Upload bukti transfer
+document.getElementById("uploadBtn").onclick = async () => {
+  const file = document.getElementById("proofFile").files[0];
+  if(!file) return alert("Silakan pilih file bukti transfer!");
 
-    alert("Bukti pembayaran berhasil diupload! Menunggu konfirmasi admin.");
-    window.location = "order_success.html";
-  }
+  const storageRef = ref(storage, `bukti_transfer/${orderId}.jpg`);
+  await uploadBytes(storageRef, file);
+
+  const url = await getDownloadURL(storageRef);
+
+  // Update status order
+  await updateDoc(docRef, {
+    status: "paid",
+    proofUrl: url
+  });
+
+  alert("✅ Bukti transfer berhasil diupload!\nStatus pesanan sekarang: PAID ✅");
+
+  // Opsi redirect ke halaman sukses
+  window.location.href = "order_success.html";
+};
 </script>
 
 </body>
