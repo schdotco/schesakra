@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Rekapitulasi Pesanan Per Hari</title>
+<title>Rekapitulasi Pesanan</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Flatpickr untuk picker tanggal -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -47,21 +47,23 @@ th { background:#f3f4f6; }
 </head>
 <body>
 
-<h2>Rekapitulasi Pesanan Per Hari</h2>
+<h2>Rekapitulasi Pesanan Terkonfirmasi</h2>
 
-<button class="button-back" onclick="goBack()">← Kembali ke Daftar Order</button>
+<!-- Tombol Kembali -->
+<button class="button-back" id="btnBack">← Kembali ke Daftar Order</button>
 
+<!-- Filter Tanggal -->
 <div class="filter-box">
   <input type="text" id="startDate" placeholder="Tanggal Awal">
   <input type="text" id="endDate" placeholder="Tanggal Akhir">
-  <button onclick="applyFilter()">Terapkan Filter</button>
+  <button id="btnFilter">Terapkan Filter</button>
 </div>
 
 <div class="table-box">
 <table>
 <thead>
 <tr>
-  <th>Tanggal</th>
+  <th>No</th>
   <th>Nama Item</th>
   <th>Qty</th>
   <th>Total Harga</th>
@@ -111,30 +113,28 @@ async function loadRekap() {
   allOrders = snapshot.docs.map(doc => {
     const d = doc.data();
     let dateObj;
-    if (d.date instanceof Object && d.date.seconds) {
+    if(d.date instanceof Object && d.date.seconds){
       dateObj = new Date(d.date.seconds * 1000);
     } else {
       dateObj = new Date(d.date);
     }
-    return { id: doc.id, ...d, dateObj };
+    return {...d, dateObj};
   });
   renderRekap(allOrders);
 }
 
-// Render tabel per tanggal per item
+// Render tabel dengan nomor urut
 function renderRekap(orders) {
-  const mapPerDateItem = {};
+  const itemsMap = {};
   let grandQty = 0;
   let grandTotal = 0;
 
   orders.forEach(o => {
     if(o.status === "confirmed") {
-      const tgl = o.dateObj.toISOString().split("T")[0]; // YYYY-MM-DD
       o.items.forEach(item => {
-        const key = tgl + "|" + item.nm;
-        if(!mapPerDateItem[key]) mapPerDateItem[key] = {qty:0, total:0};
-        mapPerDateItem[key].qty += item.q;
-        mapPerDateItem[key].total += item.q * item.p;
+        if(!itemsMap[item.nm]) itemsMap[item.nm] = {qty:0, total:0};
+        itemsMap[item.nm].qty += item.q;
+        itemsMap[item.nm].total += item.q * item.p;
         grandQty += item.q;
         grandTotal += item.q * item.p;
       });
@@ -142,18 +142,19 @@ function renderRekap(orders) {
   });
 
   rekapBody.innerHTML = "";
-  if(Object.keys(mapPerDateItem).length === 0){
+  if(Object.keys(itemsMap).length === 0){
     rekapBody.innerHTML = `<tr><td colspan="4">Belum ada pesanan yang dikonfirmasi.</td></tr>`;
     grandQtyEl.textContent = "0";
     grandTotalEl.textContent = "Rp 0";
     return;
   }
 
-  for(const [key, info] of Object.entries(mapPerDateItem)){
-    const [tgl, name] = key.split("|");
+  let no = 1;
+  for(const [name, info] of Object.entries(itemsMap)){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${tgl}</td><td>${name}</td><td>${info.qty}</td><td>Rp ${info.total.toLocaleString()}</td>`;
+    tr.innerHTML = `<td>${no}</td><td>${name}</td><td>${info.qty}</td><td>Rp ${info.total.toLocaleString()}</td>`;
     rekapBody.appendChild(tr);
+    no++;
   }
 
   grandQtyEl.textContent = grandQty;
@@ -174,10 +175,13 @@ function applyFilter() {
   renderRekap(filtered);
 }
 
+// Event tombol filter
+document.getElementById("btnFilter").addEventListener("click", applyFilter);
+
 // Tombol kembali
-function goBack() {
+document.getElementById("btnBack").addEventListener("click", ()=>{
   window.location.href = "order_list.html";
-}
+});
 
 loadRekap();
 </script>
