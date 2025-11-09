@@ -78,26 +78,27 @@ if(snapshot.exists()){
 }
 
 // Tombol Kirim WhatsApp
-document.getElementById("sendWA").onclick = () => {
-  const fileCheck = document.getElementById("proofFile").files.length;
-  if(fileCheck === 0){
-    alert("Silakan pilih bukti transfer terlebih dahulu!");
-    return;
-  }
+document.getElementById("whatsappBtn").onclick = () => {
+  const data = snapshot.data();
+  
+  // Buat string list barang
+  let itemsText = "";
+  data.items.forEach((item, idx) => {
+    itemsText += `${idx + 1}. ${item.nm} - Qty: ${item.q} - Harga: Rp ${item.p.toLocaleString()} - Subtotal: Rp ${(item.q * item.p).toLocaleString()}\n`;
+  });
 
-  const message = encodeURIComponent(
-`Halo, saya ingin konfirmasi pembayaran.
+  const text = `Halo, saya telah melakukan order dengan detail:
+Nama: ${data.name}
+Tanggal: ${data.date}
+Total: Rp ${data.grand.toLocaleString()}
 
-Nama: ${orderData.name}
-Tanggal: ${orderData.date}
-Total: Rp ${orderData.grand.toLocaleString()}
-Order ID: ${orderId}
+Daftar Barang:
+${itemsText}
+Mohon konfirmasi pembayaran.`;
 
-Saya lampirkan bukti transfer.`
-  );
-
-  // Buka WhatsApp
-  window.location.href = `https://wa.me/62816772145?text=${message}`;
+  const phone = "62816772145";
+  const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  window.open(waUrl, "_blank");
 };
 </script>
 
