@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Konfirmasi Pembayaran</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <style>
     body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
     .box { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:20px; }
@@ -13,6 +12,9 @@
       width:100%; border-radius:8px; cursor:pointer; font-size:16px;
     }
     button:hover { background:#2563eb; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align:left; }
+    th { background:#f3f4f6; }
   </style>
 </head>
 <body>
@@ -22,29 +24,19 @@
 <div id="orderInfo" class="box">Memuat data pesanan...</div>
 
 <div class="box">
-  <h3>Silakan Transfer</h3>
-
-  <b>Bank:</b> BCA<br>
-  <b>No Rekening:</b> 1234567890<br>
-  <b>Atas Nama:</b> UPTD Puskesmas Padasuka
-</div>
-
-<div class="box">
-  <h3>Kirim Bukti Transfer via WhatsApp</h3>
-  <input type="file" id="proofFile"><br><br>
-  <button id="sendWA">Kirim ke WhatsApp</button>
+  <h3>Silakan Transfer melalui WhatsApp</h3>
+  <button id="whatsappBtn">Konfirmasi & Kirim Bukti via WhatsApp</button>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, doc, getDoc } 
-from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
   authDomain: "schesakra.firebaseapp.com",
   projectId: "schesakra",
-  storageBucket: "schesakra.firebasestorage.app",
+  storageBucket: "schesakra.appspot.com",
   messagingSenderId: "672537227977",
   appId: "1:672537227977:web:88b24f905c86eba7c05318"
 };
@@ -52,49 +44,66 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Ambil Order ID
+// Ambil orderId dari localStorage
 const orderId = localStorage.getItem("selectedOrderId");
 if(!orderId){
   alert("❌ Order ID tidak ditemukan.");
   window.location.href = "order_list.html";
 }
 
-// Ambil Data Order
-let orderData;
 const docRef = doc(db, "orders", orderId);
 const snapshot = await getDoc(docRef);
 
 if(snapshot.exists()){
-  orderData = snapshot.data();
+  const data = snapshot.data();
+
+  // Tampilkan order info
+  let itemsHtml = "<table><thead><tr><th>Nama Barang</th><th>Qty</th><th>Harga</th><th>Subtotal</th></tr></thead><tbody>";
+  data.items.forEach(item=>{
+    itemsHtml += `<tr>
+      <td>${item.nm}</td>
+      <td>${item.q}</td>
+      <td>Rp ${item.p.toLocaleString()}</td>
+      <td>Rp ${(item.q*item.p).toLocaleString()}</td>
+    </tr>`;
+  });
+  itemsHtml += "</tbody></table>";
+
   document.getElementById("orderInfo").innerHTML = `
-    <b>Nama:</b> ${orderData.name}<br>
-    <b>Tanggal Order:</b> ${orderData.date}<br>
-    <b>Total Bayar:</b> <span style="color:green;">Rp ${orderData.grand.toLocaleString()}</span><br>
-    <b>Status:</b> ${orderData.status.toUpperCase()}
+    <b>Nama:</b> ${data.name} <br>
+    <b>Tanggal Order:</b> ${data.date} <br>
+    <b>Order ID:</b> ${orderId} <br><br>
+    ${itemsHtml}
+    <b>Total Pembayaran:</b> Rp ${data.grand.toLocaleString()} <br>
+    <b>Status:</b> ${data.status.toUpperCase()}
   `;
+
 } else {
   alert("❌ Order tidak ditemukan!");
   window.location.href = "order_list.html";
 }
 
-// Tombol Kirim WhatsApp
+// Tombol WhatsApp
 document.getElementById("whatsappBtn").onclick = () => {
   const data = snapshot.data();
   
-  // Buat string list barang
   let itemsText = "";
   data.items.forEach((item, idx) => {
-    itemsText += `${idx + 1}. ${item.nm} - Qty: ${item.q} - Harga: Rp ${item.p.toLocaleString()} - Subtotal: Rp ${(item.q * item.p).toLocaleString()}\n`;
+    itemsText += `${idx+1}. ${item.nm} - Qty: ${item.q} - Harga: Rp ${item.p.toLocaleString()} - Subtotal: Rp ${(item.q*item.p).toLocaleString()}\n`;
   });
 
-  const text = `Halo, saya telah melakukan order dengan detail:
+  const text = `Halo, saya ingin konfirmasi pembayaran.
+
 Nama: ${data.name}
 Tanggal: ${data.date}
-Total: Rp ${data.grand.toLocaleString()}
+Order ID: ${orderId}
 
 Daftar Barang:
 ${itemsText}
-Mohon konfirmasi pembayaran.`;
+
+Total: Rp ${data.grand.toLocaleString()}
+
+Saya lampirkan bukti transfer.`;
 
   const phone = "62816772145";
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
