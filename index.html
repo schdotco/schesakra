@@ -4,7 +4,10 @@
 <meta charset="UTF-8" />
 <title>Form Order + Pembayaran</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<script src="https://js.stripe.com/v3/"></script>
+
+<!-- Kalender -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
 body {
@@ -36,6 +39,8 @@ button {
 button:hover {
   background: #2563eb;
 }
+table { width: 100%; margin-top: 8px; }
+td { padding: 4px; }
 .total-box {
   font-size: 1.3rem;
   text-align: right;
@@ -54,12 +59,15 @@ button:hover {
 <input id="name" placeholder="Nama lengkap" />
 
 <label>Tanggal</label>
-<input id="date" type="date" />
+<input id="date" placeholder="Pilih tanggal" />
 
 <hr>
 
 <h3>Item</h3>
-<table id="items-table" style="width:100%;">
+<table>
+<thead>
+<tr><th>Nama</th><th>Qty</th><th>Harga</th></tr>
+</thead>
 <tbody id="items-body"></tbody>
 </table>
 
@@ -94,8 +102,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Tambah item row
+// ✅ Kalender aktif
+flatpickr("#date", { dateFormat: "Y-m-d" });
+
+// ✅ Tambah row item
 const itemsBody = document.getElementById("items-body");
+
 function addItemRow(){
   const tr = document.createElement("tr");
   tr.innerHTML = `
@@ -104,12 +116,15 @@ function addItemRow(){
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
   itemsBody.appendChild(tr);
+
   tr.querySelector(".item-qty").oninput = updateTotal;
   tr.querySelector(".item-price").oninput = updateTotal;
 }
-document.getElementById("add-item").onclick = addItemRow;
-addItemRow();
 
+document.getElementById("add-item").onclick = addItemRow;
+addItemRow(); // pertama kali
+
+// ✅ Hitung total
 function updateTotal(){
   let t=0;
   document.querySelectorAll("#items-body tr").forEach(tr=>{
@@ -120,38 +135,23 @@ function updateTotal(){
   document.getElementById("grand").textContent = t.toLocaleString();
 }
 
+// ✅ Simpan order
 let currentOrderId=null;
 
 document.getElementById("saveOrder").onclick = async ()=>{
-  try {
-    const name=document.getElementById("name").value;
-    const date=document.getElementById("date").value;
-    const items=[];
-    let grand=0;
+  const name=document.getElementById("name").value;
+  const date=document.getElementById("date").value;
+  const items=[];
+  let grand=0;
 
-    document.querySelectorAll("#items-body tr").forEach(tr=>{
-      const nm=tr.querySelector(".item-name").value;
-      const q=Number(tr.querySelector(".item-qty").value);
-      const p=Number(tr.querySelector(".item-price").value);
-      if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
-    });
+  document.querySelectorAll("#items-body tr").forEach(tr=>{
+    const nm=tr.querySelector(".item-name").value;
+    const q=Number(tr.querySelector(".item-qty").value);
+    const p=Number(tr.querySelector(".item-price").value);
+    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+  });
 
-    const docRef = await addDoc(collection(db,"orders"),{
-      name,date,items,grand,status:"unpaid"
-    });
-
-    currentOrderId=docRef.id;
-    document.getElementById("payButton").style.display="block";
-    alert("✅ Order tersimpan!");
-
-  } catch(e){
-    console.error("❌ ERROR SAVE:", e);
-    alert("Gagal menyimpan! Cek console!");
-  }
-};
-
-
-  const docRef = await addDoc(collection(db,"orders"),{
+  const docRef=await addDoc(collection(db,"orders"),{
     name,date,items,grand,status:"unpaid"
   });
 
@@ -160,28 +160,6 @@ document.getElementById("saveOrder").onclick = async ()=>{
   alert("✅ Order tersimpan!");
 };
 
-const stripe = Stripe("pk_test_REPLACE_WITH_YOURS"); // <-- ganti dengan publishable key kamu
-
-document.getElementById("payButton").onclick = async ()=>{
-  if(!currentOrderId) return;
-
-  if(!confirm("Apakah yakin ingin melanjutkan pembayaran?")) return;
-
-  const res = await fetch("http://localhost:5000/api/create-payment-intent",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ orderId: currentOrderId })
-  });
-
-  const { clientSecret } = await res.json();
-  const result = await stripe.confirmPayment({
-    clientSecret,
-    elements: stripe.elements()
-  });
-
-  if(result.error) alert("⚠️ " + result.error.message);
-  else alert("✅ Pembayaran Berhasil!");
-};
 </script>
 
 </body>
