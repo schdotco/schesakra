@@ -1,63 +1,85 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8" />
-<title>Form Order + Pembayaran</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-
-<!-- Kalender -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<meta charset="UTF-8">
+<title>Dashboard - Welcome</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { font-family: Arial, sans-serif; background: #f6f9fc; padding: 20px; }
-.container { max-width: 550px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-input, select, button { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; }
-button { background: #3b82f6; color: white; cursor: pointer; transition: 0.2s; }
-button:hover { background: #2563eb; }
-table { width: 100%; margin-top: 8px; }
-td { padding: 4px; }
-.total-box { font-size: 1.3rem; text-align: right; margin-top: 12px; font-weight: bold; }
+body { 
+  font-family: Arial, sans-serif; 
+  background: #f4f6f8; 
+  margin: 0; 
+  padding: 0; 
+  color: #1f2937;
+}
+
+header {
+  background: #3b82f6;
+  color: white;
+  padding: 24px 16px;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+header h1 { margin: 0; font-size: 1.8rem; }
+header p { margin: 4px 0 0; font-size: 1rem; }
+
+.container { max-width: 1100px; margin: auto; padding: 20px; }
+
+h2 { margin-bottom: 16px; font-size: 1.5rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.card h3 { margin: 0 0 8px; font-size: 1.1rem; color: #1f2937; }
+.card p { margin: 4px 0; color: #555; font-size: 0.95rem; }
+.card .price { font-weight: bold; color: #3b82f6; margin-top: 8px; }
+.card button {
+  margin-top: 12px;
+  padding: 10px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: 0.2s;
+}
+.card button:hover { background: #059669; }
+
+@media (max-width: 480px) {
+  header h1 { font-size: 1.4rem; }
+  header p { font-size: 0.9rem; }
+  h2 { font-size: 1.3rem; }
+  .card { padding: 12px; }
+  .card button { font-size: 0.9rem; }
+}
 </style>
-</head>
-
-<body>
-<div class="container">
-
-<h2>Form Order</h2>
-
-<label>Nama Pemesan</label>
-<input id="name" placeholder="Nama lengkap" />
-
-<label>Tanggal</label>
-<input id="date" placeholder="Pilih tanggal" />
-
-<hr>
-
-<h3>Item</h3>
-<table>
-<thead>
-<tr><th>Nama</th><th>Qty</th><th>Harga</th></tr>
-</thead>
-<tbody id="items-body"></tbody>
-</table>
-
-<button id="add-item">+ Tambah Item</button>
-
-<div class="total-box">
-Total: Rp <span id="grand">0</span>
-</div>
-
-<hr>
-
-<button id="saveOrder">Simpan Order</button>
-<button id="payButton" style="display:none; margin-top:14px;">Bayar Sekarang</button>
-
-</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
@@ -65,117 +87,66 @@ const firebaseConfig = {
   projectId: "schesakra",
   storageBucket: "schesakra.firebasestorage.app",
   messagingSenderId: "672537227977",
-  appId: "1:672537227977:web:88b24f905c86eba7c05318",
-  measurementId: "G-Q7HSM1LK98"
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Kalender
-flatpickr("#date", { dateFormat: "Y-m-d" });
+const productGrid = document.getElementById("productGrid");
 
-// Ambil data stok barang dari Firebase
-let stokItems = [];
-async function loadStok(){
+// Load produk/stok barang
+async function loadProducts() {
   const snapshot = await getDocs(collection(db, "stok"));
-  stokItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-await loadStok();
-
-// Tambah row item
-const itemsBody = document.getElementById("items-body");
-function addItemRow(){
-  const tr = document.createElement("tr");
-
-  // buat dropdown nama barang
-  let options = '<option value="">Pilih barang</option>';
-  stokItems.forEach(item => {
-    options += `<option value="${item.id}" data-price="${item.harga}">${item.nama}</option>`;
-  });
-
-  tr.innerHTML = `
-    <td>
-      <select class="item-name">
-        ${options}
-      </select>
-    </td>
-    <td><input class="item-qty" type="number" value="1" min="1"></td>
-    <td><input class="item-price" type="number" placeholder="Harga"></td>
-  `;
-
-  itemsBody.appendChild(tr);
-
-  const select = tr.querySelector(".item-name");
-  const priceInput = tr.querySelector(".item-price");
-  const qtyInput = tr.querySelector(".item-qty");
-
-  // ketika pilih barang, otomatis set harga
-  select.onchange = () => {
-    const selected = stokItems.find(i => i.id === select.value);
-    if(selected){
-      priceInput.value = selected.harga;
-    } else {
-      priceInput.value = "";
-    }
-    updateTotal();
-  };
-
-  qtyInput.oninput = updateTotal;
-  priceInput.oninput = updateTotal;
-}
-document.getElementById("add-item").onclick = addItemRow;
-addItemRow();
-
-// Hitung total
-function updateTotal(){
-  let t=0;
-  document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const q = Number(tr.querySelector(".item-qty").value);
-    const p = Number(tr.querySelector(".item-price").value);
-    if(q>0 && p>0) t+=q*p;
-  });
-  document.getElementById("grand").textContent = t.toLocaleString();
-}
-
-// Simpan order
-let currentOrderId=null;
-document.getElementById("saveOrder").onclick = async ()=>{
-  const name=document.getElementById("name").value;
-  const date=document.getElementById("date").value;
-  const items=[];
-  let grand=0;
-
-  document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const nmSelect = tr.querySelector(".item-name");
-    const selectedItem = stokItems.find(i=>i.id===nmSelect.value);
-    const q = Number(tr.querySelector(".item-qty").value);
-    const p = Number(tr.querySelector(".item-price").value);
-    if(selectedItem && q>0 && p>0){
-      items.push({ nm:selectedItem.nama, q, p });
-      grand += q*p;
-    }
-  });
-
-  const docRef = await addDoc(collection(db,"orders"),{
-    name,date,items,grand,status:"unpaid"
-  });
-
-  currentOrderId = docRef.id;
-  document.getElementById("payButton").style.display="block";
-  alert("✅ Order tersimpan!");
-};
-
-// Bayar sekarang
-document.getElementById("payButton").onclick = ()=>{
-  if(!currentOrderId){
-    alert("Order belum disimpan!");
+  productGrid.innerHTML = "";
+  if(snapshot.empty){
+    productGrid.innerHTML = "<p>Tidak ada produk saat ini.</p>";
     return;
   }
-  localStorage.setItem("selectedOrderId", currentOrderId);
-  window.location.href = "order_pay.html";
-};
+
+  snapshot.docs.forEach(docSnap=>{
+    const data = docSnap.data();
+    const card = document.createElement("div");
+    card.classList.add("card");
+    card.innerHTML = `
+      <h3>${data.name}</h3>
+      <p>Deskripsi: ${data.description || "-"}</p>
+      <p class="price">Rp ${data.price.toLocaleString()}</p>
+      <button>Order Sekarang</button>
+    `;
+    const btn = card.querySelector("button");
+    btn.onclick = () => {
+      // Simpan produk yang dipilih ke localStorage agar otomatis muncul di order.html
+      localStorage.setItem("selectedProduct", JSON.stringify({
+        name: data.name,
+        price: data.price,
+        description: data.description || ""
+      }));
+      // Arahkan ke order.html
+      window.location.href = "order.html";
+    };
+
+    productGrid.appendChild(card);
+  });
+}
+
+loadProducts();
 </script>
+
+</head>
+<body>
+
+<header>
+  <h1>Selamat Datang!</h1>
+  <p>Anda telah mengakses situs ini. Silakan pilih produk untuk order.</p>
+</header>
+
+<div class="container">
+  <h2>Produk Tersedia</h2>
+  <div class="grid" id="productGrid">
+    Memuat produk...
+  </div>
+</div>
 
 </body>
 </html>
