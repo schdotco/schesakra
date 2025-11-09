@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Rekapitulasi Pesanan</title>
+<title>Rekapitulasi Pesanan Per Hari</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Flatpickr untuk picker tanggal -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -12,11 +12,11 @@
 body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:16px; color:#1f2937; }
 h2 { text-align:center; margin-bottom:16px; }
 .filter-box {
-  max-width: 550px; margin: 0 auto 16px auto;
+  max-width: 600px; margin: 0 auto 16px auto;
   background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08);
   display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
 }
-.filter-box input { padding:10px; border-radius:8px; border:1px solid #ccc; width:120px; }
+.filter-box input { padding:10px; border-radius:8px; border:1px solid #ccc; width:130px; }
 .filter-box button {
   background:#3b82f6; color:white; border:none; padding:10px 16px; border-radius:8px; cursor:pointer;
   transition:0.2s;
@@ -47,12 +47,10 @@ th { background:#f3f4f6; }
 </head>
 <body>
 
-<h2>Rekapitulasi Pesanan Terkonfirmasi</h2>
+<h2>Rekapitulasi Pesanan Per Hari</h2>
 
-<!-- Tombol Kembali -->
 <button class="button-back" onclick="goBack()">← Kembali ke Daftar Order</button>
 
-<!-- Filter Tanggal -->
 <div class="filter-box">
   <input type="text" id="startDate" placeholder="Tanggal Awal">
   <input type="text" id="endDate" placeholder="Tanggal Akhir">
@@ -63,17 +61,18 @@ th { background:#f3f4f6; }
 <table>
 <thead>
 <tr>
+  <th>Tanggal</th>
   <th>Nama Item</th>
-  <th>Total Qty</th>
+  <th>Qty</th>
   <th>Total Harga</th>
 </tr>
 </thead>
 <tbody id="rekapBody">
-<tr><td colspan="3">Memuat data...</td></tr>
+<tr><td colspan="4">Memuat data...</td></tr>
 </tbody>
 <tfoot>
 <tr class="total-row">
-  <td>Total Keseluruhan</td>
+  <td colspan="2">Grand Total</td>
   <td id="grandQty">0</td>
   <td id="grandTotal">Rp 0</td>
 </tr>
@@ -106,18 +105,15 @@ flatpickr("#endDate", { dateFormat: "Y-m-d" });
 
 let allOrders = [];
 
-// Load semua order dari Firestore
+// Load semua order
 async function loadRekap() {
   const snapshot = await getDocs(collection(db, "orders"));
   allOrders = snapshot.docs.map(doc => {
     const d = doc.data();
     let dateObj;
-    // Pastikan date disimpan sebagai objek Date
     if (d.date instanceof Object && d.date.seconds) {
-      // Jika Firestore Timestamp
       dateObj = new Date(d.date.seconds * 1000);
     } else {
-      // Jika string
       dateObj = new Date(d.date);
     }
     return { id: doc.id, ...d, dateObj };
@@ -125,18 +121,20 @@ async function loadRekap() {
   renderRekap(allOrders);
 }
 
-// Render tabel rekap
+// Render tabel per tanggal per item
 function renderRekap(orders) {
-  const itemsMap = {};
-  let grandTotal = 0;
+  const mapPerDateItem = {};
   let grandQty = 0;
+  let grandTotal = 0;
 
-  orders.forEach(data => {
-    if(data.status === "confirmed") {
-      data.items.forEach(item => {
-        if(!itemsMap[item.nm]) itemsMap[item.nm] = {qty:0, total:0};
-        itemsMap[item.nm].qty += item.q;
-        itemsMap[item.nm].total += item.q * item.p;
+  orders.forEach(o => {
+    if(o.status === "confirmed") {
+      const tgl = o.dateObj.toISOString().split("T")[0]; // YYYY-MM-DD
+      o.items.forEach(item => {
+        const key = tgl + "|" + item.nm;
+        if(!mapPerDateItem[key]) mapPerDateItem[key] = {qty:0, total:0};
+        mapPerDateItem[key].qty += item.q;
+        mapPerDateItem[key].total += item.q * item.p;
         grandQty += item.q;
         grandTotal += item.q * item.p;
       });
@@ -144,16 +142,17 @@ function renderRekap(orders) {
   });
 
   rekapBody.innerHTML = "";
-  if(Object.keys(itemsMap).length === 0){
-    rekapBody.innerHTML = `<tr><td colspan="3">Belum ada pesanan yang dikonfirmasi.</td></tr>`;
+  if(Object.keys(mapPerDateItem).length === 0){
+    rekapBody.innerHTML = `<tr><td colspan="4">Belum ada pesanan yang dikonfirmasi.</td></tr>`;
     grandQtyEl.textContent = "0";
     grandTotalEl.textContent = "Rp 0";
     return;
   }
 
-  for(const [name, info] of Object.entries(itemsMap)){
+  for(const [key, info] of Object.entries(mapPerDateItem)){
+    const [tgl, name] = key.split("|");
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${name}</td><td>${info.qty}</td><td>Rp ${info.total.toLocaleString()}</td>`;
+    tr.innerHTML = `<td>${tgl}</td><td>${name}</td><td>${info.qty}</td><td>Rp ${info.total.toLocaleString()}</td>`;
     rekapBody.appendChild(tr);
   }
 
@@ -161,19 +160,15 @@ function renderRekap(orders) {
   grandTotalEl.textContent = "Rp " + grandTotal.toLocaleString();
 }
 
-// Filter berdasarkan tanggal
+// Filter tanggal
 function applyFilter() {
   const start = document.getElementById("startDate").value;
   const end = document.getElementById("endDate").value;
-
-  if(!start || !end){
-    alert("Pilih tanggal awal dan akhir!");
-    return;
-  }
+  if(!start || !end){ alert("Pilih tanggal awal dan akhir!"); return; }
 
   const startDate = new Date(start);
   const endDate = new Date(end);
-  endDate.setHours(23,59,59,999); // akhir hari inklusif
+  endDate.setHours(23,59,59,999);
 
   const filtered = allOrders.filter(o => o.dateObj >= startDate && o.dateObj <= endDate);
   renderRekap(filtered);
