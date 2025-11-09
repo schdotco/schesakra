@@ -1,4 +1,4 @@
-// Create Payment Intent untuk order tertentu
+// Create Payment Intent untuk suatu Order
 app.post('/api/create-payment-intent', authenticate, async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -7,47 +7,44 @@ app.post('/api/create-payment-intent', authenticate, async (req, res) => {
       return res.status(400).json({ error: "orderId required" });
     }
 
-    // Ambil order dari Firestore
-    const orderRef = db.collection('orders').doc(orderId);
-    const orderSnap = await orderRef.get();
+    const orderRef = admin.firestore().collection('orders').doc(orderId);
+    const snap = await orderRef.get();
 
-    if (!orderSnap.exists) {
+    if (!snap.exists) {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    const order = orderSnap.data();
+    const order = snap.data();
 
-    // Hanya pemilik order atau admin yang boleh bayar
+    // Hanya owner / admin yang boleh
     if (order.ownerUid !== req.user.uid && !req.isAdmin) {
-      return res.status(403).json({ error: "Not authorized" });
+      return res.status(403).json({ error: "Not allowed" });
     }
 
-    // Hitung total order (pastikan ini valid & integer untuk Stripe)
-    const amount = Math.round(order.total * 100); // Stripe pakai sen
+    // Pastikan nilai pakai field yang benar (kamu pilih satu)
+    const total = order.total ?? order.grand ?? 0;
+    const amount = Math.round(total * 100); // Stripe pakai sen
+
     if (amount <= 0) {
-      return res.status(400).json({ error: "Invalid total amount" });
+      return res.status(400).json({ error: "Invalid order total amount" });
     }
 
-    // Buat PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: "idr",
       metadata: { orderId }
     });
 
-    // Simpan status ke Firestore
     await orderRef.update({
-      status: "payment_pending",
       paymentIntentId: paymentIntent.id,
+      status: "payment_pending",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    return res.json({
-      clientSecret: paymentIntent.client_secret
-    });
+    return res.json({ clientSecret: paymentIntent.client_secret });
 
-  } catch (err) {
-    console.error("Payment Intent Error:", err);
-    return res.status(500).json({ error: err.message });
+  } catch (e) {
+    console.error("Payment Intent Error:", e);
+    return res.status(500).json({ error: e.message });
   }
 });
