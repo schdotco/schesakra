@@ -2,47 +2,37 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Daftar Order</title>
+<title>Menu Admin - Daftar Order</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
-
 <style>
-body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
-h2 { text-align:center; }
+body { font-family: Arial, sans-serif; background:#f0f4f8; padding:12px; margin:0; }
+h2 { text-align:center; color:#1f2937; }
 .table-box {
-  background:white; padding:20px; border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  background:white; padding:16px; border-radius:12px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  overflow-x:auto;
 }
-table { width:100%; border-collapse: collapse; }
+table { width:100%; border-collapse: collapse; font-size:14px; }
 th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+th { background:#f3f4f6; font-weight:600; }
+.order-row:hover { background:#e0ebff; cursor:pointer; }
 .status-unpaid { color:#d00000; font-weight:bold; }
 .status-paid { color:#007b1c; font-weight:bold; }
-.order-row:hover { background:#f1f5ff; cursor:pointer; }
+button.action-btn {
+  background:#3b82f6; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;
+  font-size:13px; margin-right:4px; transition:0.2s;
+}
+button.action-btn:hover { background:#2563eb; }
+@media (max-width:480px){
+  table, th, td { font-size:12px; }
+  button.action-btn { padding:4px 8px; font-size:12px; }
+}
 </style>
-</head>
-<body>
-
-<h2>Daftar Order</h2>
-
-<div class="table-box">
-<table>
-<thead>
-<tr>
-  <th>Nama</th>
-  <th>Tanggal</th>
-  <th>Total</th>
-  <th>Status</th>
-</tr>
-</thead>
-<tbody id="orders"></tbody>
-</table>
-</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot } 
+import { getFirestore, collection, onSnapshot, doc, updateDoc } 
 from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -62,24 +52,67 @@ const ordersBody = document.getElementById("orders");
 // Real-time listener
 onSnapshot(collection(db, "orders"), snapshot=>{
   ordersBody.innerHTML = "";
-  snapshot.forEach(doc=>{
-    const d=doc.data();
-    ordersBody.innerHTML += `
-      <tr class="order-row" onclick="viewOrder('${doc.id}')">
-        <td>${d.name}</td>
-        <td>${d.date}</td>
-        <td>Rp ${d.grand.toLocaleString()}</td>
-        <td class="status-${d.status}">${d.status.toUpperCase()}</td>
-      </tr>
+  snapshot.forEach(docSnap=>{
+    const d = docSnap.data();
+    const tr = document.createElement("tr");
+    tr.classList.add("order-row");
+
+    tr.innerHTML = `
+      <td>${d.name}</td>
+      <td>${d.date}</td>
+      <td>Rp ${d.grand.toLocaleString()}</td>
+      <td class="status-${d.status}">${d.status.toUpperCase()}</td>
+      <td>
+        <button class="action-btn" onclick="confirmOrder('${docSnap.id}')">Konfirmasi</button>
+        <button class="action-btn" onclick="markPaid('${docSnap.id}')">Sudah Bayar</button>
+      </td>
     `;
+
+    tr.onclick = (e)=>{
+      if(e.target.tagName !== "BUTTON"){
+        localStorage.setItem("selectedOrderId", docSnap.id);
+        window.location.href = "order_pay.html";
+      }
+    }
+
+    ordersBody.appendChild(tr);
   });
 });
 
-window.viewOrder=(id)=>{
-  localStorage.setItem("selectedOrderId", id);
-  window.location.href="order_pay.html"; // bisa diarahkan ke order detail
+// Update status menjadi "confirmed"
+window.confirmOrder = async (id)=>{
+  const docRef = doc(db, "orders", id);
+  await updateDoc(docRef, { status:"confirmed" });
+  alert("✅ Order dikonfirmasi!");
+};
+
+// Update status menjadi "paid"
+window.markPaid = async (id)=>{
+  const docRef = doc(db, "orders", id);
+  await updateDoc(docRef, { status:"paid" });
+  alert("✅ Status dibayar!");
 };
 </script>
+</head>
+
+<body>
+
+<h2>Menu Admin - Daftar Order</h2>
+
+<div class="table-box">
+<table>
+<thead>
+<tr>
+  <th>Nama</th>
+  <th>Tanggal</th>
+  <th>Total</th>
+  <th>Status</th>
+  <th>Aksi</th>
+</tr>
+</thead>
+<tbody id="orders"></tbody>
+</table>
+</div>
 
 </body>
 </html>
