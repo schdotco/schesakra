@@ -36,7 +36,6 @@ button {
 button:hover {
   background: #2563eb;
 }
-#items-table td { padding: 4px 0; }
 .total-box {
   font-size: 1.3rem;
   text-align: right;
@@ -60,7 +59,6 @@ button:hover {
 <hr>
 
 <h3>Item</h3>
-
 <table id="items-table" style="width:100%;">
 <tbody id="items-body"></tbody>
 </table>
@@ -74,132 +72,101 @@ Total: Rp <span id="grand">0</span>
 <hr>
 
 <button id="saveOrder">Simpan Order</button>
-<button id="payButton" style="display:none; margin-top:12px;">Bayar Sekarang</button>
+<button id="payButton" style="display:none; margin-top:14px;">Bayar Sekarang</button>
 
 </div>
 
 <script type="module">
-/* ---------------- FIREBASE INIT ---------------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider }
-  from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, doc, getDoc }
-  from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  // ✅ GANTI DENGAN KONFIGURASI KAMU
-    apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
-    authDomain: "schesakra.firebaseapp.com",
-    projectId: "schesakra",
-    storageBucket: "schesakra.firebasestorage.app",
-    messagingSenderId: "672537227977",
-    appId: "1:672537227977:web:88b24f905c86eba7c05318",
-    measurementId: "G-Q7HSM1LK98"
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318",
+  measurementId: "G-Q7HSM1LK98"
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ---------------- LOGIN OTOMATIS ---------------- */
-onAuthStateChanged(auth, async (user)=> {
-  if (!user) await signInWithPopup(auth, new GoogleAuthProvider());
-});
-
-/* ---------------- ITEMS FORM ---------------- */
+// Tambah item row
 const itemsBody = document.getElementById("items-body");
-const addItemBtn = document.getElementById("add-item");
-
-function addItemRow() {
-  const row = document.createElement("tr");
-  row.innerHTML = `
+function addItemRow(){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
     <td><input class="item-name" placeholder="Nama barang"></td>
-    <td><input class="item-qty" type="number" placeholder="Qty" min="1" value="1"></td>
+    <td><input class="item-qty" type="number" value="1" min="1"></td>
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
-  itemsBody.appendChild(row);
-
-  row.querySelector(".item-qty").addEventListener("input", updateTotal);
-  row.querySelector(".item-price").addEventListener("input", updateTotal);
+  itemsBody.appendChild(tr);
+  tr.querySelector(".item-qty").oninput = updateTotal;
+  tr.querySelector(".item-price").oninput = updateTotal;
 }
+document.getElementById("add-item").onclick = addItemRow;
 addItemRow();
-addItemBtn.onclick = addItemRow;
 
-function updateTotal() {
-  let total = 0;
+function updateTotal(){
+  let t=0;
   document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const qty = Number(tr.querySelector(".item-qty").value) || 0;
-    const price = Number(tr.querySelector(".item-price").value) || 0;
-    total += qty * price;
+    const q = Number(tr.querySelector(".item-qty").value);
+    const p = Number(tr.querySelector(".item-price").value);
+    if(q>0 && p>0) t+=q*p;
   });
-  document.getElementById("grand").textContent = total.toLocaleString();
+  document.getElementById("grand").textContent = t.toLocaleString();
 }
 
-/* ---------------- SIMPAN ORDER ---------------- */
-let currentOrderId = null;
-const saveBtn = document.getElementById("saveOrder");
-const payBtn = document.getElementById("payButton");
+let currentOrderId=null;
 
-saveBtn.onclick = async ()=>{
-  const user = auth.currentUser;
-  if (!user) return alert("User belum login!");
-
-  const name = document.getElementById("name").value;
-  const date = document.getElementById("date").value;
-  const items = [];
-  let grand = 0;
+document.getElementById("saveOrder").onclick = async ()=>{
+  const name=document.getElementById("name").value;
+  const date=document.getElementById("date").value;
+  const items=[];
+  let grand=0;
 
   document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const item = tr.querySelector(".item-name").value;
-    const qty = Number(tr.querySelector(".item-qty").value);
-    const price = Number(tr.querySelector(".item-price").value);
-    if(item && qty>0 && price>0){
-      items.push({ id:item, qty, price });
-      grand += qty*price;
-    }
+    const nm=tr.querySelector(".item-name").value;
+    const q=Number(tr.querySelector(".item-qty").value);
+    const p=Number(tr.querySelector(".item-price").value);
+    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
   });
 
-  const order = await addDoc(collection(db,"orders"),{
-    name,
-    date,
-    items,
-    grand,
-    status:"new",
-    ownerUid:user.uid
+  const docRef = await addDoc(collection(db,"orders"),{
+    name,date,items,grand,status:"unpaid"
   });
 
-  currentOrderId = order.id;
-  payBtn.style.display = "block";
-  alert("✅ Order disimpan!");
+  currentOrderId=docRef.id;
+  document.getElementById("payButton").style.display="block";
+  alert("✅ Order tersimpan!");
 };
 
-/* ---------------- PEMBAYARAN STRIPE ---------------- */
-const stripe = Stripe("pk_test_xxxxxxxxxxxxxxxxxxxxxxxxx"); // ✅ GANTI PUNYA KAMU
+const stripe = Stripe("pk_test_REPLACE_WITH_YOURS"); // <-- ganti dengan publishable key kamu
 
-payBtn.onclick = async ()=>{
-  if (!currentOrderId) return alert("Simpan order dulu!");
+document.getElementById("payButton").onclick = async ()=>{
+  if(!currentOrderId) return;
 
-  const token = await auth.currentUser.getIdToken();
+  if(!confirm("Apakah yakin ingin melanjutkan pembayaran?")) return;
+
   const res = await fetch("http://localhost:5000/api/create-payment-intent",{
     method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer "+token
-    },
+    headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ orderId: currentOrderId })
   });
 
-  const data = await res.json();
-  const clientSecret = data.clientSecret;
-
-  const { error } = await stripe.confirmCardPayment(clientSecret, {
-    payment_method: { card: { token: "tok_visa" } } // akan otomatis muncul UI
+  const { clientSecret } = await res.json();
+  const result = await stripe.confirmPayment({
+    clientSecret,
+    elements: stripe.elements()
   });
 
-  if(error) alert("⚠️ " + error.message);
-  else alert("✅ Pembayaran berhasil!");
+  if(result.error) alert("⚠️ " + result.error.message);
+  else alert("✅ Pembayaran Berhasil!");
 };
-
 </script>
+
 </body>
 </html>
