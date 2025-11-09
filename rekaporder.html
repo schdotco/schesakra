@@ -4,96 +4,44 @@
 <meta charset="UTF-8">
 <title>Rekapitulasi Pesanan</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Flatpickr untuk date picker -->
+<!-- Flatpickr untuk picker tanggal -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f4f6f8;
-  margin: 0;
-  padding: 16px;
-  color: #1f2937;
-}
-
-h2 {
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-.button-back {
-  display: block;
-  margin: 0 auto 12px auto;
-  background: #10b981;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.button-back:hover { background: #059669; }
-
+body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:16px; color:#1f2937; }
+h2 { text-align:center; margin-bottom:16px; }
 .filter-box {
-  max-width: 550px;
-  margin: 0 auto 16px auto;
-  background: white;
-  padding: 12px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
+  max-width: 550px; margin: 0 auto 16px auto;
+  background:white; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
 }
-
-.filter-box input {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  width: 120px;
-}
-
+.filter-box input { padding:10px; border-radius:8px; border:1px solid #ccc; width:120px; }
 .filter-box button {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.2s;
+  background:#3b82f6; color:white; border:none; padding:10px 16px; border-radius:8px; cursor:pointer;
+  transition:0.2s;
 }
-.filter-box button:hover { background: #2563eb; }
+.filter-box button:hover { background:#2563eb; }
 
 .table-box {
-  background: white;
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  overflow-x: auto;
+  background:white; padding:16px; border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08); overflow-x:auto;
 }
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+th, td { border:1px solid #ddd; padding:10px; text-align:left; }
+th { background:#f3f4f6; }
+.total-row { font-weight:bold; background:#e5e7eb; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
+.button-back {
+  display:block; margin:0 auto 12px auto;
+  background:#10b981; color:white; border:none; padding:10px 16px;
+  border-radius:8px; cursor:pointer; transition:0.2s;
 }
-
-th, td {
-  border: 1px solid #ddd;
-  padding: 10px;
-  text-align: left;
-}
-
-th { background: #f3f4f6; }
-
-.total-row { font-weight: bold; background: #e5e7eb; }
+.button-back:hover { background:#059669; }
 
 @media (max-width:480px){
   .filter-box { flex-direction: column; gap:6px; align-items:center; }
-  .filter-box input { width: 80%; }
+  .filter-box input { width:80%; }
 }
 </style>
 </head>
@@ -163,11 +111,16 @@ async function loadRekap() {
   const snapshot = await getDocs(collection(db, "orders"));
   allOrders = snapshot.docs.map(doc => {
     const d = doc.data();
-    return {
-      id: doc.id,
-      ...d,
-      dateObj: new Date(d.date)
-    };
+    let dateObj;
+    // Pastikan date disimpan sebagai objek Date
+    if (d.date instanceof Object && d.date.seconds) {
+      // Jika Firestore Timestamp
+      dateObj = new Date(d.date.seconds * 1000);
+    } else {
+      // Jika string
+      dateObj = new Date(d.date);
+    }
+    return { id: doc.id, ...d, dateObj };
   });
   renderRekap(allOrders);
 }
