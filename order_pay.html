@@ -5,11 +5,6 @@
   <title>Konfirmasi Pembayaran</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js"></script>
-
   <style>
     body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
     .box { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:20px; }
@@ -18,14 +13,18 @@
       width:100%; border-radius:8px; cursor:pointer; font-size:16px;
     }
     button:hover { background:#2563eb; }
+    .hidden { display:none; }
   </style>
 </head>
 <body>
 
 <h2>Konfirmasi Pembayaran</h2>
 
+<div id="orderInfo" class="box">Memuat data pesanan...</div>
+
 <div class="box">
-  <b>Silakan transfer ke rekening berikut:</b><br><br>
+  <h3>Silakan Transfer</h3>
+
   <b>Bank:</b> BCA<br>
   <b>No Rekening:</b> 1234567890<br>
   <b>Atas Nama:</b> UPTD Puskesmas Padasuka
@@ -48,7 +47,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
   authDomain: "schesakra.firebaseapp.com",
   projectId: "schesakra",
-  storageBucket: "schesakra.firebasestorage.app",
+  storageBucket: "schesakra.appspot.com",
   messagingSenderId: "672537227977",
   appId: "1:672537227977:web:88b24f905c86eba7c05318"
 };
@@ -57,42 +56,46 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Ambil orderId
 const orderId = localStorage.getItem("selectedOrderId");
-
-// Ambil info order & tampilkan ringkasnya
-const docRef = doc(db, "orders", orderId);
-const snapshot = await getDoc(docRef);
-if(snapshot.exists()){
-  const data = snapshot.data();
-  alert(`ORDER DITEMUKAN ✅
-Nama: ${data.name}
-Tanggal: ${data.date}
-Total: Rp ${data.grand.toLocaleString()}
-Status Saat Ini: ${data.status}`);
-} else {
-  alert("❌ Order tidak ditemukan!");
+if(!orderId){
+  alert("❌ Order ID tidak ditemukan.");
+  window.location.href = "order_list.html";
 }
 
-// Upload bukti transfer
+const docRef = doc(db, "orders", orderId);
+const snapshot = await getDoc(docRef);
+
+if(snapshot.exists()){
+  const data = snapshot.data();
+  document.getElementById("orderInfo").innerHTML = `
+    <b>Nama:</b> ${data.name} <br>
+    <b>Tanggal Order:</b> ${data.date} <br>
+    <b>Total Pembayaran:</b> <span style="color:green;">Rp ${data.grand.toLocaleString()}</span><br>
+    <b>Status:</b> ${data.status.toUpperCase()}
+  `;
+} else {
+  alert("❌ Order tidak ditemukan!");
+  window.location.href = "order_list.html";
+}
+
 document.getElementById("uploadBtn").onclick = async () => {
   const file = document.getElementById("proofFile").files[0];
   if(!file) return alert("Silakan pilih file bukti transfer!");
+
+  document.getElementById("uploadBtn").innerText = "Mengupload...";
+  document.getElementById("uploadBtn").disabled = true;
 
   const storageRef = ref(storage, `bukti_transfer/${orderId}.jpg`);
   await uploadBytes(storageRef, file);
 
   const url = await getDownloadURL(storageRef);
 
-  // Update status order
   await updateDoc(docRef, {
     status: "paid",
     proofUrl: url
   });
 
-  alert("✅ Bukti transfer berhasil diupload!\nStatus pesanan sekarang: PAID ✅");
-
-  // Opsi redirect ke halaman sukses
+  alert("✅ Pembayaran berhasil dikonfirmasi! Status sekarang: PAID ✅");
   window.location.href = "order_list.html";
 };
 </script>
