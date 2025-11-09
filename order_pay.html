@@ -1,31 +1,103 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Konfirmasi Pembayaran</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
-    .box { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:20px; }
-    button {
-      background:#3b82f6; color:white; border:none; padding:12px;
-      width:100%; border-radius:8px; cursor:pointer; font-size:16px;
-    }
-    button:hover { background:#2563eb; }
-    table { width:100%; border-collapse: collapse; margin-top:10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align:left; }
-    th { background:#f3f4f6; }
-  </style>
+<meta charset="UTF-8">
+<title>Konfirmasi Pembayaran</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f0f4f8;
+    padding: 12px;
+    margin: 0;
+  }
+
+  .container {
+    max-width: 500px;
+    width: 100%;
+    margin: auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    padding: 16px;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 16px;
+    text-align: center;
+    color: #1f2937;
+  }
+
+  .box {
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 16px;
+  }
+
+  button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 14px;
+    width: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: 0.2s;
+  }
+
+  button:hover {
+    background: #2563eb;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    text-align: left;
+  }
+
+  th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+
+  .status {
+    margin-top: 8px;
+    font-weight: bold;
+    color: #1e40af;
+  }
+
+  @media (max-width: 480px) {
+    h2 { font-size: 1.3rem; }
+    table, th, td { font-size: 12px; }
+    button { padding: 12px; font-size: 15px; }
+  }
+</style>
 </head>
 <body>
 
+<div class="container">
 <h2>Konfirmasi Pembayaran</h2>
 
-<div id="orderInfo" class="box">Memuat data pesanan...</div>
+<div id="orderInfo" class="box">
+  Memuat data pesanan...
+</div>
 
 <div class="box">
-  <h3>Silakan Transfer melalui WhatsApp</h3>
+  <h3 style="margin-bottom:12px;">Silakan Transfer melalui WhatsApp</h3>
   <button id="whatsappBtn">Konfirmasi & Kirim Bukti via WhatsApp</button>
+</div>
 </div>
 
 <script type="module">
@@ -44,7 +116,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Ambil orderId dari localStorage
 const orderId = localStorage.getItem("selectedOrderId");
 if(!orderId){
   alert("❌ Order ID tidak ditemukan.");
@@ -57,7 +128,7 @@ const snapshot = await getDoc(docRef);
 if(snapshot.exists()){
   const data = snapshot.data();
 
-  // Tampilkan order info
+  // Buat tabel barang
   let itemsHtml = "<table><thead><tr><th>Nama Barang</th><th>Qty</th><th>Harga</th><th>Subtotal</th></tr></thead><tbody>";
   data.items.forEach(item=>{
     itemsHtml += `<tr>
@@ -75,18 +146,15 @@ if(snapshot.exists()){
     <b>Order ID:</b> ${orderId} <br><br>
     ${itemsHtml}
     <b>Total Pembayaran:</b> Rp ${data.grand.toLocaleString()} <br>
-    <b>Status:</b> ${data.status.toUpperCase()}
+    <span class="status"><b>Status:</b> ${data.status.toUpperCase()}</span>
   `;
-
 } else {
   alert("❌ Order tidak ditemukan!");
   window.location.href = "order_list.html";
 }
 
-// Tombol WhatsApp
 document.getElementById("whatsappBtn").onclick = () => {
   const data = snapshot.data();
-  
   let itemsText = "";
   data.items.forEach((item, idx) => {
     itemsText += `${idx+1}. ${item.nm} - Qty: ${item.q} - Harga: Rp ${item.p.toLocaleString()} - Subtotal: Rp ${(item.q*item.p).toLocaleString()}\n`;
@@ -100,7 +168,6 @@ Order ID: ${orderId}
 
 Daftar Barang:
 ${itemsText}
-
 Total: Rp ${data.grand.toLocaleString()}
 
 Saya lampirkan bukti transfer.`;
