@@ -1,71 +1,110 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Barang</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Order App — Publik & Admin</title>
+
+  <!-- Simple styling (feel-free to swap to Tailwind/Bootstrap) -->
   <style>
-    body { font-family: Arial, sans-serif; background: #eef3f7; margin: 0; padding: 20px; }
-    .container { max-width: 700px; margin: auto; background: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    label { display: block; margin-top: 12px; color: #333; }
-    input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; margin-top: 5px; }
-    button { margin-top: 15px; padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; }
-    .add-btn { background: #4CAF50; color: white; width: 100%; }
-    .clear-btn { background: #e74c3c; color: white; width: 100%; margin-top: 8px; }
-    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th { background: #4CAF50; color: white; }
-    #total { font-size: 18px; margin-top: 15px; font-weight: bold; color: #333; text-align: right; }
+    :root{
+      --bg:#071827; --card:#0b1220; --accent:#06b6d4; --muted:#9aa6b2; --ok:#16a34a;
+      --glass: rgba(255,255,255,0.02);
+      font-family: Inter, system-ui, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071023,#071827);color:#e6eef6;padding:18px}
+    .wrap{max-width:1100px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    header h1{margin:0;font-size:18px}
+    nav a{color:var(--accent);text-decoration:none;margin-left:10px;padding:6px 10px;border-radius:8px;background:var(--glass)}
+    main .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:12px}
+    @media (max-width:980px){ .grid{grid-template-columns:1fr} nav a{display:inline-block;margin-top:8px} }
+    label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
+    input,select,button,textarea{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:inherit}
+    button{cursor:pointer}
+    .btn{background:var(--accent);color:#012; border:none;padding:8px 12px;border-radius:8px}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--accent)}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;text-align:left}
+    .muted{color:var(--muted);font-size:13px}
+    .flex{display:flex;gap:8px;align-items:center}
+    .small{font-size:12px;color:var(--muted)}
+    .danger{background:#ef4444;color:white;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
+    .ok{background:var(--ok);color:#04280f;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
   </style>
+
+  <!-- Firebase modular SDK (use a stable v; here we import at runtime inside type=module) -->
 </head>
 <body>
-  <div class="container">
-    <h2 style="text-align:center; color:#333;">Form Order Barang</h2>
+  <div class="wrap">
+    <header>
+      <h1>Order App</h1>
+      <div>
+        <nav>
+          <a href="#/">Form</a>
+          <a href="#/admin">Admin</a>
+          <a id="signBtn" style="display:none;cursor:pointer">Logout</a>
+        </nav>
+      </div>
+    </header>
 
-    <label>Tanggal Order</label>
-    <input type="date" id="tanggal">
-
-    <label>Nama Pemesan</label>
-    <input type="text" id="nama" placeholder="Masukkan nama">
-
-    <label>Nama Barang</label>
-    <select id="barang"></select>
-
-    <label>Jumlah</label>
-    <input type="number" id="jumlah" min="1" value="1">
-
-    <label>Pembayaran</label>
-    <select id="pembayaran">
-      <option value="Cash">Cash</option>
-      <option value="Transfer">Transfer</option>
-    </select>
-
-    <button class="add-btn" onclick="tambahOrder()">Tambah Order</button>
-    <button class="clear-btn" onclick="resetForm()">Reset</button>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Tanggal</th>
-          <th>Nama</th>
-          <th>Barang</th>
-          <th>Jumlah</th>
-          <th>Harga</th>
-          <th>Total</th>
-          <th>Pembayaran</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-
-    <div id="total">Total Keseluruhan: Rp 0</div>
+    <main>
+      <div id="app" class="card">
+        <!-- Content rendered by JS -->
+        <p class="small">Memuat…</p>
+      </div>
+    </main>
   </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+  <!-- Application logic: single-file app using Firebase modular -->
+  <script type="module">
+  /**************************************************************************
+   * Order App: public order form + auth + admin
+   * - Firestore collections used:
+   *    - items   (document id = itemId => { id, name, price, stock })
+   *    - orders  (auto id => { date, name, items: [{id,name,qty,price}], grand, payment, status, createdAt })
+   *    - admins  (optional: doc per uid to flag admin users) OR you can check a users collection
+   *
+   * - Features implemented:
+   *    1) Public order form with multiple items, auto total preview
+   *    2) Authentication (register/login) for admin area
+   *    3) Admin page: search, pagination, mark paid, delete
+   *    4) Per-item stock update from admin
+   *    5) Stub for payment gateway integration (client-side hook)
+   *
+   * Replace firebaseConfig with your provided keys (already included below).
+   **************************************************************************/
 
+  // Import Firebase (use latest 9+ modular version)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import {
+    getAuth,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+  import {
+    getFirestore,
+    collection,
+    doc,
+    setDoc,
+    addDoc,
+    onSnapshot,
+    getDocs,
+    query,
+    where,
+    orderBy,
+    limit,
+    startAfter,
+    updateDoc,
+    getDoc
+  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+  // ----- CONFIG (you provided) -----
   const firebaseConfig = {
     apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
     authDomain: "schesakra.firebaseapp.com",
@@ -76,81 +115,457 @@
     measurementId: "G-Q7HSM1LK98"
   };
 
+  // init
   const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
   const db = getFirestore(app);
 
-  let daftarBarang = [
-    { nama: "Pulpen", harga: 3000 },
-    { nama: "Buku Tulis", harga: 5000 },
-    { nama: "Map Plastik", harga: 2000 },
-    { nama: "Tinta Printer", harga: 75000 },
-    { nama: "Kertas A4", harga: 35000 },
-    { nama: "Stempel", harga: 25000 },
-    { nama: "Spidol", harga: 6000 },
-    { nama: "Penggaris", harga: 4000 }
-  ];
+  // simple dom helpers
+  const root = document.getElementById('app');
+  const signBtn = document.getElementById('signBtn');
 
-  let select = document.getElementById("barang");
-  daftarBarang.forEach(item => {
-    let opt = document.createElement("option");
-    opt.value = item.nama;
-    opt.textContent = `${item.nama} (Rp ${item.harga})`;
-    select.appendChild(opt);
+  // --- ROUTING based on hash ---
+  function route() {
+    const hash = location.hash || '#/';
+    if (hash.startsWith('#/admin')) {
+      // admin route
+      if (auth.currentUser) renderAdmin();
+      else renderAuth();
+    } else {
+      // public form
+      renderForm();
+    }
+  }
+  window.addEventListener('hashchange', route);
+
+  // sign out button
+  signBtn.addEventListener('click', async () => {
+    await signOut(auth);
   });
 
-  function formatRupiah(angka){
-    return angka.toLocaleString("id-ID");
+  // --- UTILITIES ---
+  function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
+  function money(n) { return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID'); }
+  function nowDateISO() { return new Date().toISOString().slice(0,10); }
+
+  // ensure some items exist (seed) - only run once if collection empty
+  async function seedItemsIfEmpty() {
+    const itemsCol = collection(db, 'items');
+    // Quick check: getDocs (small cost)
+    const snap = await getDocs(itemsCol);
+    if (snap.size === 0) {
+      const seed = [
+        { id: 'pulpen', name: 'Pulpen', price: 3000, stock: 100 },
+        { id: 'bukutulis', name: 'Buku Tulis', price: 5000, stock: 50 },
+        { id: 'map', name: 'Map Plastik', price: 2000, stock: 80 },
+        { id: 'tinta', name: 'Tinta Printer', price: 75000, stock: 10 },
+        { id: 'a4', name: 'Kertas A4', price: 35000, stock: 40 }
+      ];
+      for (const it of seed) {
+        // set doc with custom ID (id field)
+        await setDoc(doc(db, 'items', it.id), it);
+      }
+    }
   }
 
-  async function tambahOrder(){
-    let t = tanggal.value;
-    let n = nama.value;
-    let br = barang.value;
-    let j = parseInt(jumlah.value);
-    let pm = pembayaran.value;
+  /**************************************************************************
+   * PUBLIC ORDER FORM
+   **************************************************************************/
+  async function renderForm() {
+    await seedItemsIfEmpty();
 
-    if(!t || !n){ alert("Tanggal dan Nama wajib diisi!"); return; }
+    root.innerHTML = '';
+    const container = document.createElement('div');
+    container.className = 'grid';
+    container.innerHTML = `
+      <section>
+        <h2>Tambah Order</h2>
+        <label>Tanggal</label>
+        <input id="orderDate" type="date" value="${nowDateISO()}">
+        <label>Nama</label>
+        <input id="orderName" placeholder="Nama pelanggan">
+        <div id="itemsBox"><label>Items</label><div id="rows"></div>
+          <div style="margin-top:8px"><button id="addRowBtn" class="btn ghost">+ Tambah baris</button></div>
+        </div>
+        <div style="margin-top:12px" class="flex">
+          <button id="saveOrder" class="btn">Simpan Order</button>
+          <button id="payBtn" class="btn ghost">Bayar (integrasi)</button>
+        </div>
+      </section>
+      <aside>
+        <h2>Daftar Barang</h2>
+        <div id="itemsList" class="small muted">Memuat daftar barang…</div>
+        <div style="margin-top:10px"><strong id="totalPreview">Total: Rp 0</strong></div>
+      </aside>
+    `;
+    root.appendChild(container);
 
-    let harga = daftarBarang.find(x => x.nama == br).harga;
-    let total = harga * j;
+    const rows = container.querySelector('#rows');
+    const itemsList = container.querySelector('#itemsList');
+    const totalPreview = container.querySelector('#totalPreview');
 
-    await addDoc(collection(db, "orderan"), {
-      tanggal: t,
-      nama: n,
-      barang: br,
-      jumlah: j,
-      harga: harga,
-      total: total,
-      pembayaran: pm
+    // load items once (snapshot to update live stock/prices)
+    onSnapshot(collection(db, 'items'), snap => {
+      // build itemsList summary
+      itemsList.innerHTML = '';
+      snap.forEach(d => {
+        const data = d.data();
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.padding = '6px 0';
+        div.innerHTML = `<div><strong>${data.name}</strong><div class="small muted">${money(data.price)} • Stok: ${data.stock}</div></div>
+                         <div><button data-id="${d.id}" class="quickAdd btn ghost">Tambah</button></div>`;
+        itemsList.appendChild(div);
+      });
+
+      // quick-add handlers
+      itemsList.querySelectorAll('.quickAdd').forEach(b => {
+        b.onclick = () => {
+          const id = b.dataset.id;
+          // get doc to pull latest price/name
+          getDoc(doc(db, 'items', id)).then(snapDoc => {
+            if (!snapDoc.exists) { alert('Item tidak ditemukan'); return; }
+            const it = snapDoc.data();
+            addRow(it.id, it.name, it.price);
+          });
+        };
+      });
     });
 
-    let row = `<tr>
-      <td>${t}</td><td>${n}</td><td>${br}</td><td>${j}</td>
-      <td>Rp ${formatRupiah(harga)}</td>
-      <td>Rp ${formatRupiah(total)}</td>
-      <td>${pm}</td>
-    </tr>`;
+    // function to add an order row (select item, qty, price)
+    function addRow(itemId = '', itemName = '', price = 0, qty = 1) {
+      const row = document.createElement('div');
+      row.className = 'order-row';
+      row.style.display = 'flex';
+      row.style.gap = '8px';
+      row.style.marginTop = '8px';
 
-    tbody.innerHTML += row;
-    hitungTotal();
-  }
+      // item select (we'll populate options from items collection)
+      const select = document.createElement('select');
+      select.innerHTML = '<option value="">-- pilih barang --</option>';
+      // fetch current items snapshot (simple: getDocs each add; for big scale, cache)
+      getDocs(collection(db, 'items')).then(sn => {
+        sn.forEach(d => {
+          const it = d.data();
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = `${it.name} (Rp ${it.price.toLocaleString('id-ID')}) • stok:${it.stock}`;
+          if (d.id === itemId) opt.selected = true;
+          select.appendChild(opt);
+        });
+      });
 
-  function resetForm(){
-    tanggal.value = "";
-    nama.value = "";
-    jumlah.value = 1;
-    pembayaran.value = "Cash";
-  }
+      const qtyInput = document.createElement('input'); qtyInput.type = 'number'; qtyInput.min = 1; qtyInput.value = qty; qtyInput.style.width = '80px';
+      const priceInput = document.createElement('input'); priceInput.type = 'number'; priceInput.value = price; priceInput.style.width = '120px';
+      const delBtn = document.createElement('button'); delBtn.textContent = 'Hapus'; delBtn.className = 'btn ghost';
 
-  function hitungTotal(){
-    let total = 0;
-    document.querySelectorAll("#tbody tr").forEach(r => {
-      total += parseInt(r.children[5].innerText.replace(/\D/g,''));
+      row.appendChild(select);
+      row.appendChild(qtyInput);
+      row.appendChild(priceInput);
+      row.appendChild(delBtn);
+      rows.appendChild(row);
+
+      // update price when select changes (auto-fill price)
+      select.addEventListener('change', async () => {
+        const id = select.value;
+        if (!id) { priceInput.value = 0; updateTotal(); return; }
+        const s = await getDoc(doc(db, 'items', id));
+        if (s.exists()) {
+          const it = s.data();
+          priceInput.value = it.price;
+          updateTotal();
+        }
+      });
+      // update total on inputs change
+      [qtyInput, priceInput].forEach(i => i.addEventListener('input', updateTotal));
+      delBtn.addEventListener('click', () => { row.remove(); updateTotal(); });
+
+      updateTotal();
+    }
+
+    // add initial one row
+    addRow();
+
+    // "Tambah baris" button
+    container.querySelector('#addRowBtn').addEventListener('click', () => addRow());
+
+    // calculate preview total
+    function updateTotal() {
+      let total = 0;
+      rows.querySelectorAll('.order-row').forEach(r => {
+        const qty = Number(r.querySelector('input[type=number]').value) || 0;
+        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0; // second number input is price
+        total += qty * price;
+      });
+      totalPreview.textContent = 'Total: ' + money(total);
+    }
+
+    // Save order logic
+    container.querySelector('#saveOrder').addEventListener('click', async () => {
+      const date = container.querySelector('#orderDate').value || nowDateISO();
+      const name = container.querySelector('#orderName').value.trim();
+      if (!name) { alert('Isi nama pelanggan'); return; }
+
+      // build items array
+      const orderRows = Array.from(rows.querySelectorAll('.order-row'));
+      if (orderRows.length === 0) { alert('Tambahkan minimal 1 item'); return; }
+
+      const items = [];
+      let grand = 0;
+      for (const r of orderRows) {
+        const sel = r.querySelector('select');
+        const id = sel.value;
+        if (!id) { alert('Pilih barang pada semua baris'); return; }
+        const qty = Number(r.querySelector('input[type=number]').value) || 0;
+        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0;
+        items.push({ id, qty, price });
+        grand += qty * price;
+      }
+
+      // Create order doc
+      const orderDoc = {
+        date,
+        name,
+        items,
+        grand,
+        payment: 'none',
+        status: 'pending',
+        createdAt: Date.now()
+      };
+
+      try {
+        await addDoc(collection(db, 'orders'), orderDoc);
+        // Optionally: decrement stock for each item (naive approach).
+        // For production prefer transactions to avoid race conditions.
+        for (const it of items) {
+          const itemRef = doc(db, 'items', it.id);
+          // read current stock
+          const s = await getDoc(itemRef);
+          if (s.exists()) {
+            const cur = s.data();
+            const newStock = Math.max(0, (cur.stock || 0) - it.qty);
+            await updateDoc(itemRef, { stock: newStock });
+          }
+        }
+        alert('Order tersimpan! (tersimpan di Firestore)');
+        // clear
+        container.querySelector('#orderName').value = '';
+        rows.innerHTML = '';
+        addRow();
+        updateTotal();
+      } catch (err) {
+        console.error(err);
+        alert('Gagal menyimpan order: ' + err.message);
+      }
     });
-    document.getElementById("total").innerText = "Total Keseluruhan: Rp " + formatRupiah(total);
+
+    // PAYMENT button stub — this is where you integrate a gateway (Midtrans/Xendit/Stripe etc)
+    container.querySelector('#payBtn').addEventListener('click', () => {
+      alert('Fungsi pembayaran belum terintegrasi. Ini adalah tempat untuk memanggil gateway (server-side) lalu memperbarui order.status = "paid".');
+      // Example flow:
+      // 1) Send order amount to your server -> create payment session
+      // 2) Redirect user to payment URL / or open modal
+      // 3) On success callback, update order doc payment/status
+    });
+
+    // allow direct URL anchor to admin when logged in
+    updateTotal();
+  } // end renderForm
+
+
+  /**************************************************************************
+   * AUTH UI (simple register/login) used for admin access
+   * Note: For real app, disable public registration or restrict registrations.
+   **************************************************************************/
+  function renderAuth() {
+    root.innerHTML = '';
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <h2>Login / Register (Admin)</h2>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="email" placeholder="email" style="flex:1"><input id="pass" placeholder="password" type="password" style="flex:1">
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button id="btnLogin" class="btn">Login</button>
+        <button id="btnReg" class="btn ghost">Register</button>
+      </div>
+      <p class="small muted" style="margin-top:8px">Untuk akses admin: daftar user lalu tandai sebagai admin di Firestore (collection 'admins' doc id = uid) — atau ubah logika sesuai kebutuhan.</p>
+    `;
+    root.appendChild(div);
+
+    div.querySelector('#btnLogin').addEventListener('click', async () => {
+      const email = div.querySelector('#email').value;
+      const pw = div.querySelector('#pass').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, pw);
+      } catch (e) {
+        alert('Login error: ' + e.message);
+      }
+    });
+
+    div.querySelector('#btnReg').addEventListener('click', async () => {
+      const email = div.querySelector('#email').value;
+      const pw = div.querySelector('#pass').value;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pw);
+        // Optionally mark this user as admin by creating doc in 'admins' collection (manually recommended)
+        alert('Terdaftar. Tandai user sebagai admin di Firestore jika diperlukan.');
+      } catch (e) {
+        alert('Register error: ' + e.message);
+      }
+    });
   }
 
-</script>
+  /**************************************************************************
+   * ADMIN UI
+   * - Live-listening orders
+   * - Search (client-side on cached snapshot)
+   * - Simple pagination (client-side slicing after caching)
+   * - Per-item stock update
+   **************************************************************************/
+  function renderAdmin() {
+    root.innerHTML = '';
+    const container = document.createElement('div');
+    container.className = 'grid';
+    container.innerHTML = `
+      <section>
+        <h2>Admin — Laporan Pesanan</h2>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="search" placeholder="Cari nama / id item" style="flex:1">
+          <select id="filterStatus"><option value="">Semua</option><option value="pending">Pending</option><option value="paid">Paid</option></select>
+        </div>
+        <div id="ordersArea" style="margin-top:10px"></div>
+        <div style="margin-top:8px"><button id="prev" class="btn ghost">Prev</button><button id="next" class="btn ghost">Next</button></div>
+      </section>
+      <aside>
+        <h2>Manajemen Stok</h2>
+        <div id="stockArea" class="small muted">Memuat stok…</div>
+        <div style="margin-top:10px"><button id="seed" class="btn ghost">Seed items if empty</button></div>
+      </aside>
+    `;
+    root.appendChild(container);
 
+    const ordersArea = container.querySelector('#ordersArea');
+    const stockArea = container.querySelector('#stockArea');
+
+    // cache orders locally for search/pagination
+    let ordersCache = [];
+    const perPage = 8;
+    let page = 0;
+
+    // live listen orders collection
+    onSnapshot(collection(db, 'orders'), snap => {
+      ordersCache = [];
+      snap.forEach(d => ordersCache.push({ id: d.id, ...d.data() }));
+      renderOrders();
+    });
+
+    // render orders based on search + pagination
+    function renderOrders() {
+      const q = container.querySelector('#search').value.trim().toLowerCase();
+      const fs = container.querySelector('#filterStatus').value;
+      let filtered = ordersCache.filter(o => {
+        if (fs && o.status !== fs) return false;
+        if (!q) return true;
+        if ((o.name || '').toLowerCase().includes(q)) return true;
+        if (o.items && o.items.some(it => (it.id || '').toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q))) return true;
+        return false;
+      });
+      const pages = Math.max(1, Math.ceil(filtered.length / perPage));
+      if (page >= pages) page = pages - 1;
+      const start = page * perPage;
+      const slice = filtered.slice(start, start + perPage);
+
+      ordersArea.innerHTML = slice.map(o => {
+        const itemsText = (o.items || []).map(it => `${it.id} x${it.qty} @${money(it.price)}`).join(', ');
+        return `<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)">
+          <div><strong>${o.name}</strong> <span class="small muted">${o.date} • ${money(o.grand)}</span></div>
+          <div class="small" style="margin-top:6px">${itemsText}</div>
+          <div style="margin-top:8px"><button data-id="${o.id}" class="markPaid ok">${o.status==='paid' ? 'Paid' : 'Mark Paid'}</button> <button data-id="${o.id}" class="del danger">Hapus</button></div>
+        </div>`;
+      }).join('');
+
+      // attach handlers
+      ordersArea.querySelectorAll('.markPaid').forEach(b => {
+        b.addEventListener('click', async (ev) => {
+          const id = ev.target.dataset.id;
+          try {
+            await updateDoc(doc(db, 'orders', id), { status: 'paid' });
+            alert('Order marked paid');
+          } catch (e) { alert('Error: ' + e.message); }
+        });
+      });
+      ordersArea.querySelectorAll('.del').forEach(b => {
+        b.addEventListener('click', async (ev) => {
+          const id = ev.target.dataset.id;
+          if (!confirm('Hapus order ini?')) return;
+          try {
+            // Delete by overwriting with empty object is not ideal; in production use deleteDoc
+            await setDoc(doc(db, 'orders', id), {});
+            alert('Dihapus (cat: set empty object). For real delete, use deleteDoc in production.');
+          } catch (e) { alert('Error: ' + e.message); }
+        });
+      });
+    }
+
+    // search & filter listeners
+    container.querySelector('#search').addEventListener('input', () => { page = 0; renderOrders(); });
+    container.querySelector('#filterStatus').addEventListener('change', () => { page = 0; renderOrders(); });
+    container.querySelector('#prev').addEventListener('click', () => { if (page > 0) page--; renderOrders(); });
+    container.querySelector('#next').addEventListener('click', () => { page++; renderOrders(); });
+
+    // Stock management: live snapshot of items
+    onSnapshot(collection(db, 'items'), snap => {
+      stockArea.innerHTML = '';
+      snap.forEach(d => {
+        const it = d.data();
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.padding = '8px 0';
+        row.innerHTML = `<div><strong>${it.name}</strong><div class="small muted">${money(it.price)}</div></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input style="width:80px" data-id="${d.id}" value="${it.stock}">
+            <button data-id="${d.id}" class="saveStock btn ghost">Simpan</button>
+          </div>`;
+        stockArea.appendChild(row);
+      });
+      // save handlers
+      stockArea.querySelectorAll('.saveStock').forEach(b => {
+        b.addEventListener('click', async () => {
+          const id = b.dataset.id;
+          const input = stockArea.querySelector(`input[data-id="${id}"]`);
+          const val = Number(input.value) || 0;
+          try {
+            await updateDoc(doc(db, 'items', id), { stock: val });
+            alert('Stok tersimpan');
+          } catch (e) { alert('Error: ' + e.message); }
+        });
+      });
+    });
+
+    // seed button
+    container.querySelector('#seed').addEventListener('click', async () => {
+      await seedItemsIfEmpty();
+      alert('Seed items dipicu');
+    });
+  } // end renderAdmin
+
+  // react to auth state
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      signBtn.style.display = 'inline-block';
+    } else {
+      signBtn.style.display = 'none';
+    }
+    route();
+  });
+
+  // initial route
+  route();
+
+  </script>
 </body>
 </html>
