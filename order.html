@@ -78,7 +78,7 @@ td, th {
   h2 { font-size: 1.4rem; }
   h3 { font-size: 1.1rem; }
   .total-box { font-size: 1.1rem; }
-  input, button { padding: 10px; font-size: 15px; }
+  input, button, select { padding: 10px; font-size: 15px; }
 }
 </style>
 </head>
@@ -109,7 +109,7 @@ td, th {
 <button id="add-item">+ Tambah Item</button>
 
 <div class="total-box">
-  Total: Rp <span id="grand">0</span>
+Total: Rp <span id="grand">0</span>
 </div>
 
 <hr>
@@ -121,7 +121,7 @@ td, th {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc } 
+import { getFirestore, collection, addDoc, getDocs } 
 from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -140,62 +140,91 @@ const db = getFirestore(app);
 // Kalender aktif
 flatpickr("#date", { dateFormat: "Y-m-d" });
 
-// Tambah row item
 const itemsBody = document.getElementById("items-body");
 
-function addItemRow(){
+// Tambah row item dengan dropdown dari stok
+async function addItemRow() {
   const tr = document.createElement("tr");
+
+  // Ambil stok barang dari Firestore
+  const stokSnapshot = await getDocs(collection(db, "stok"));
+  let options = '<option value="">Pilih barang</option>';
+  stokSnapshot.docs.forEach(docSnap => {
+    const data = docSnap.data();
+    options += `<option value="${data.name}" data-price="${data.price}">${data.name}</option>`;
+  });
+
   tr.innerHTML = `
-    <td><input class="item-name" placeholder="Nama barang"></td>
+    <td>
+      <select class="item-name">
+        ${options}
+      </select>
+    </td>
     <td><input class="item-qty" type="number" value="1" min="1"></td>
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
   itemsBody.appendChild(tr);
 
+  const selectEl = tr.querySelector(".item-name");
+  const priceEl = tr.querySelector(".item-price");
+
+  // Set harga otomatis saat pilih barang
+  selectEl.onchange = () => {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    priceEl.value = selected.dataset.price || "";
+    updateTotal();
+  };
+
   tr.querySelector(".item-qty").oninput = updateTotal;
-  tr.querySelector(".item-price").oninput = updateTotal;
+  priceEl.oninput = updateTotal;
 }
 
 document.getElementById("add-item").onclick = addItemRow;
-addItemRow(); // pertama kali
+addItemRow(); // row pertama
 
 // Hitung total
-function updateTotal(){
-  let t=0;
-  document.querySelectorAll("#items-body tr").forEach(tr=>{
+function updateTotal() {
+  let t = 0;
+  document.querySelectorAll("#items-body tr").forEach(tr => {
     const q = Number(tr.querySelector(".item-qty").value);
     const p = Number(tr.querySelector(".item-price").value);
-    if(q>0 && p>0) t+=q*p;
+    if(q>0 && p>0) t += q*p;
   });
   document.getElementById("grand").textContent = t.toLocaleString();
 }
 
 // Simpan order
-let currentOrderId=null;
+let currentOrderId = null;
+document.getElementById("saveOrder").onclick = async () => {
+  const name = document.getElementById("name").value.trim();
+  const date = document.getElementById("date").value.trim();
+  const items = [];
+  let grand = 0;
 
-document.getElementById("saveOrder").onclick = async ()=>{
-  const name=document.getElementById("name").value;
-  const date=document.getElementById("date").value;
-  const items=[];
-  let grand=0;
-
-  document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const nm=tr.querySelector(".item-name").value;
-    const q=Number(tr.querySelector(".item-qty").value);
-    const p=Number(tr.querySelector(".item-price").value);
-    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+  document.querySelectorAll("#items-body tr").forEach(tr => {
+    const nm = tr.querySelector(".item-name").value;
+    const q = Number(tr.querySelector(".item-qty").value);
+    const p = Number(tr.querySelector(".item-price").value);
+    if(nm && q>0 && p>0) {
+      items.push({nm,q,p});
+      grand += q*p;
+    }
   });
 
-  const docRef=await addDoc(collection(db,"orders"),{
-    name,date,items,grand,status:"unpaid"
+  if(!name || !date || items.length === 0){
+    return alert("Lengkapi semua data order!");
+  }
+
+  const docRef = await addDoc(collection(db,"orders"),{
+    name, date, items, grand, status:"unpaid"
   });
 
-  currentOrderId=docRef.id;
-  document.getElementById("payButton").style.display="block";
+  currentOrderId = docRef.id;
+  document.getElementById("payButton").style.display = "block";
   alert("✅ Order tersimpan!");
 };
 
-document.getElementById("payButton").onclick = ()=>{
+document.getElementById("payButton").onclick = () => {
   if(!currentOrderId){
     alert("Order belum disimpan!");
     return;
@@ -204,7 +233,6 @@ document.getElementById("payButton").onclick = ()=>{
   localStorage.setItem("selectedOrderId", currentOrderId);
   window.location.href = "order_pay.html";
 };
-
 </script>
 
 </body>
