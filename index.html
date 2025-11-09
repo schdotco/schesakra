@@ -1,94 +1,93 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Order App — Publik & Admin + Payment</title>
+<meta charset="UTF-8" />
+<title>Form Order + Pembayaran</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://js.stripe.com/v3/"></script>
 
-  <style>
-    :root{
-      --bg:#071827; --card:#0b1220; --accent:#06b6d4; --muted:#9aa6b2; --ok:#16a34a;
-      --glass: rgba(255,255,255,0.02);
-      font-family: Inter, system-ui, Arial, sans-serif;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#071023,#071827);color:#e6eef6;padding:18px}
-    .wrap{max-width:1100px;margin:0 auto}
-    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-    header h1{margin:0;font-size:18px}
-    nav a{color:var(--accent);text-decoration:none;margin-left:10px;padding:6px 10px;border-radius:8px;background:var(--glass)}
-    main .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
-    .grid{display:grid;grid-template-columns:1fr 360px;gap:12px}
-    @media (max-width:980px){ .grid{grid-template-columns:1fr} nav a{display:inline-block;margin-top:8px} }
-    label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
-    input,select,button,textarea{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:inherit}
-    button{cursor:pointer}
-    .btn{background:var(--accent);color:#012; border:none;padding:8px 12px;border-radius:8px}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--accent)}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;text-align:left}
-    .muted{color:var(--muted);font-size:13px}
-    .flex{display:flex;gap:8px;align-items:center}
-    .small{font-size:12px;color:var(--muted)}
-    .danger{background:#ef4444;color:white;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
-    .ok{background:var(--ok);color:#04280f;border:none;padding:6px 8px;border-radius:6px;cursor:pointer}
-    /* Stripe card placeholder */
-    #card-element { padding: 12px; background: rgba(255,255,255,0.02); border-radius:8px; }
-    #paymentModal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); }
-    #paymentModal .modal { background:var(--card); padding:16px; border-radius:8px; width:420px; max-width:90%;}
-  </style>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f6f9fc;
+  padding: 20px;
+}
+.container {
+  max-width: 550px;
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+button {
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+button:hover {
+  background: #2563eb;
+}
+#items-table td { padding: 4px 0; }
+.total-box {
+  font-size: 1.3rem;
+  text-align: right;
+  margin-top: 12px;
+  font-weight: bold;
+}
+</style>
 </head>
+
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Order App</h1>
-      <div>
-        <nav>
-          <a href="#/">Form</a>
-          <a href="#/admin">Admin</a>
-          <a id="signBtn" style="display:none;cursor:pointer">Logout</a>
-        </nav>
-      </div>
-    </header>
+<div class="container">
 
-    <main>
-      <div id="app" class="card">
-        <p class="small">Memuat…</p>
-      </div>
-    </main>
-  </div>
+<h2>Form Order</h2>
 
-  <!-- Stripe.js (for client-side confirmCardPayment). Replace publishable key below -->
-  <script src="https://js.stripe.com/v3/"></script>
+<label>Nama Pemesan</label>
+<input id="name" placeholder="Nama lengkap" />
 
-  <script type="module">
-  /**************************************************************************
-   * Full single-file client app:
-   * - Firebase auth/firestore usage
-   * - Save order with ownerUid if logged in
-   * - Payment flow:
-   *   1) call server /api/create-payment-intent with orderId and ID token
-   *   2) server creates PaymentIntent (Stripe) and returns clientSecret
-   *   3) client shows Stripe Elements card input and calls confirmCardPayment(clientSecret)
-   *   4) on success, server webhook should mark order status 'paid' (but we also update client-side)
-   *
-   * IMPORTANT:
-   * - Set STRIPE_PUBLISHABLE_KEY to your key.
-   * - Ensure your server endpoint /api/create-payment-intent exists and validates ID token.
-   **************************************************************************/
+<label>Tanggal</label>
+<input id="date" type="date" />
 
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-  import {
-    getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-    signInWithEmailAndPassword, signOut
-  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-  import {
-    getFirestore, collection, doc, setDoc, addDoc, onSnapshot,
-    getDocs, query, where, orderBy, limit, startAfter, updateDoc, getDoc, deleteDoc, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+<hr>
 
-  // ---------- CONFIG ----------
-  const firebaseConfig = {
+<h3>Item</h3>
+
+<table id="items-table" style="width:100%;">
+<tbody id="items-body"></tbody>
+</table>
+
+<button id="add-item">+ Tambah Item</button>
+
+<div class="total-box">
+Total: Rp <span id="grand">0</span>
+</div>
+
+<hr>
+
+<button id="saveOrder">Simpan Order</button>
+<button id="payButton" style="display:none; margin-top:12px;">Bayar Sekarang</button>
+
+</div>
+
+<script type="module">
+/* ---------------- FIREBASE INIT ---------------- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider }
+  from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, doc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  // ✅ GANTI DENGAN KONFIGURASI KAMU
     apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
     authDomain: "schesakra.firebaseapp.com",
     projectId: "schesakra",
@@ -96,477 +95,111 @@
     messagingSenderId: "672537227977",
     appId: "1:672537227977:web:88b24f905c86eba7c05318",
     measurementId: "G-Q7HSM1LK98"
-  };
+};
 
-  // Replace with your Stripe publishable key
-  const STRIPE_PUBLISHABLE_KEY = "pk_test_REPLACE_WITH_YOURS";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  // Replace with your server origin if different (used to call /api/create-payment-intent)
-  const SERVER_ORIGIN = ""; // e.g. "https://api.example.com" or "" for same origin
+/* ---------------- LOGIN OTOMATIS ---------------- */
+onAuthStateChanged(auth, async (user)=> {
+  if (!user) await signInWithPopup(auth, new GoogleAuthProvider());
+});
 
-  // ---------- INIT ----------
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+/* ---------------- ITEMS FORM ---------------- */
+const itemsBody = document.getElementById("items-body");
+const addItemBtn = document.getElementById("add-item");
 
-  // DOM helpers
-  const root = document.getElementById('app');
-  const signBtn = document.getElementById('signBtn');
+function addItemRow() {
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td><input class="item-name" placeholder="Nama barang"></td>
+    <td><input class="item-qty" type="number" placeholder="Qty" min="1" value="1"></td>
+    <td><input class="item-price" type="number" placeholder="Harga"></td>
+  `;
+  itemsBody.appendChild(row);
 
-  function money(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
-  function nowDateISO(){ return new Date().toISOString().slice(0,10); }
+  row.querySelector(".item-qty").addEventListener("input", updateTotal);
+  row.querySelector(".item-price").addEventListener("input", updateTotal);
+}
+addItemRow();
+addItemBtn.onclick = addItemRow;
 
-  // Seed items if empty
-  async function seedItemsIfEmpty(){
-    const col = collection(db,'items');
-    const snap = await getDocs(col);
-    if(snap.size===0){
-      const seed=[
-        { id:'pulpen',name:'Pulpen',price:3000,stock:100 },
-        { id:'bukutulis',name:'Buku Tulis',price:5000,stock:50 },
-        { id:'map',name:'Map Plastik',price:2000,stock:80 },
-        { id:'tinta',name:'Tinta Printer',price:75000,stock:10 },
-        { id:'a4',name:'Kertas A4',price:35000,stock:40 }
-      ];
-      for(const it of seed){
-        await setDoc(doc(db,'items',it.id), it);
-      }
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll("#items-body tr").forEach(tr=>{
+    const qty = Number(tr.querySelector(".item-qty").value) || 0;
+    const price = Number(tr.querySelector(".item-price").value) || 0;
+    total += qty * price;
+  });
+  document.getElementById("grand").textContent = total.toLocaleString();
+}
+
+/* ---------------- SIMPAN ORDER ---------------- */
+let currentOrderId = null;
+const saveBtn = document.getElementById("saveOrder");
+const payBtn = document.getElementById("payButton");
+
+saveBtn.onclick = async ()=>{
+  const user = auth.currentUser;
+  if (!user) return alert("User belum login!");
+
+  const name = document.getElementById("name").value;
+  const date = document.getElementById("date").value;
+  const items = [];
+  let grand = 0;
+
+  document.querySelectorAll("#items-body tr").forEach(tr=>{
+    const item = tr.querySelector(".item-name").value;
+    const qty = Number(tr.querySelector(".item-qty").value);
+    const price = Number(tr.querySelector(".item-price").value);
+    if(item && qty>0 && price>0){
+      items.push({ id:item, qty, price });
+      grand += qty*price;
     }
-  }
-
-  // Simple router
-  function route(){
-    const hash = location.hash||'#/';
-    if(hash.startsWith('#/admin')){
-      if(auth.currentUser) renderAdmin();
-      else renderAuth();
-    } else {
-      renderForm();
-    }
-  }
-  window.addEventListener('hashchange', route);
-  signBtn.addEventListener('click', async ()=> await signOut(auth));
-
-  /**************************************************************************
-   * PUBLIC ORDER FORM
-   **************************************************************************/
-  async function renderForm(){
-    await seedItemsIfEmpty();
-
-    root.innerHTML = '';
-    const container = document.createElement('div');
-    container.className = 'grid';
-    container.innerHTML = `
-      <section>
-        <h2>Tambah Order</h2>
-        <label>Tanggal</label>
-        <input id="orderDate" type="date" value="${nowDateISO()}">
-        <label>Nama</label>
-        <input id="orderName" placeholder="Nama pelanggan">
-        <div id="itemsBox"><label>Items</label><div id="rows"></div>
-          <div style="margin-top:8px"><button id="addRowBtn" class="btn ghost">+ Tambah baris</button></div>
-        </div>
-        <div style="margin-top:12px" class="flex">
-          <button id="saveOrder" class="btn">Simpan Order</button>
-          <button id="payBtn" class="btn ghost">Bayar Sekarang</button>
-        </div>
-      </section>
-      <aside>
-        <h2>Daftar Barang</h2>
-        <div id="itemsList" class="small muted">Memuat daftar barang…</div>
-        <div style="margin-top:10px"><strong id="totalPreview">Total: Rp 0</strong></div>
-      </aside>
-    `;
-    root.appendChild(container);
-
-    const rows = container.querySelector('#rows');
-    const itemsList = container.querySelector('#itemsList');
-    const totalPreview = container.querySelector('#totalPreview');
-
-    onSnapshot(collection(db,'items'), snap=>{
-      itemsList.innerHTML = '';
-      snap.forEach(d=>{
-        const data = d.data();
-        const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
-        div.style.padding = '6px 0';
-        div.innerHTML = `<div><strong>${data.name}</strong><div class="small muted">${money(data.price)} • Stok: ${data.stock}</div></div>
-                         <div><button data-id="${d.id}" class="quickAdd btn ghost">Tambah</button></div>`;
-        itemsList.appendChild(div);
-      });
-      itemsList.querySelectorAll('.quickAdd').forEach(b=>{
-        b.onclick = async ()=>{
-          const id = b.dataset.id;
-          const snapDoc = await getDoc(doc(db,'items',id));
-          if(!snapDoc.exists()) { alert('Item tidak ditemukan'); return; }
-          const it = snapDoc.data();
-          addRow(it.id, it.name, it.price);
-        };
-      });
-    });
-
-    function addRow(itemId='', itemName='', price=0, qty=1){
-      const row = document.createElement('div');
-      row.className = 'order-row';
-      row.style.display = 'flex';
-      row.style.gap = '8px';
-      row.style.marginTop = '8px';
-
-      const select = document.createElement('select');
-      select.innerHTML = '<option value="">-- pilih barang --</option>';
-      // populate options
-      getDocs(collection(db,'items')).then(sn=>{
-        sn.forEach(d=>{
-          const it = d.data();
-          const opt = document.createElement('option');
-          opt.value = d.id;
-          opt.textContent = `${it.name} (Rp ${it.price.toLocaleString('id-ID')}) • stok:${it.stock}`;
-          if(d.id === itemId) opt.selected = true;
-          select.appendChild(opt);
-        });
-      });
-
-      const qtyInput = document.createElement('input'); qtyInput.type='number'; qtyInput.min=1; qtyInput.value=qty; qtyInput.style.width='80px';
-      const priceInput = document.createElement('input'); priceInput.type='number'; priceInput.value=price; priceInput.style.width='120px';
-      const delBtn = document.createElement('button'); delBtn.textContent='Hapus'; delBtn.className='btn ghost';
-
-      row.appendChild(select);
-      row.appendChild(qtyInput);
-      row.appendChild(priceInput);
-      row.appendChild(delBtn);
-      rows.appendChild(row);
-
-      select.addEventListener('change', async ()=>{
-        const id = select.value;
-        if(!id){ priceInput.value=0; updateTotal(); return; }
-        const s = await getDoc(doc(db,'items',id));
-        if(s.exists()){ priceInput.value = s.data().price; updateTotal(); }
-      });
-      [qtyInput, priceInput].forEach(i=>i.addEventListener('input', updateTotal));
-      delBtn.addEventListener('click', ()=>{ row.remove(); updateTotal(); });
-
-      updateTotal();
-    }
-
-    // init one row
-    addRow();
-    container.querySelector('#addRowBtn').addEventListener('click', ()=> addRow());
-
-    function updateTotal(){
-      let total = 0;
-      rows.querySelectorAll('.order-row').forEach(r=>{
-        const qty = Number(r.querySelector('input[type=number]').value) || 0;
-        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0; // second is price
-        total += qty * price;
-      });
-      totalPreview.textContent = 'Total: ' + money(total);
-    }
-
-    // Save order
-    container.querySelector('#saveOrder').addEventListener('click', async ()=>{
-      const date = container.querySelector('#orderDate').value || nowDateISO();
-      const name = container.querySelector('#orderName').value.trim();
-      if(!name){ alert('Isi nama pelanggan'); return; }
-
-      const orderRows = Array.from(rows.querySelectorAll('.order-row'));
-      if(orderRows.length === 0){ alert('Tambahkan minimal 1 item'); return; }
-
-      const items = [];
-      let grand = 0;
-      for(const r of orderRows){
-        const sel = r.querySelector('select');
-        const id = sel.value;
-        if(!id){ alert('Pilih barang pada semua baris'); return; }
-        const qty = Number(r.querySelector('input[type=number]').value) || 0;
-        const price = Number(r.querySelectorAll('input[type=number]')[1].value) || 0;
-        items.push({ id, qty, price });
-        grand += qty * price;
-      }
-
-      const orderDoc = {
-        date, name, items, grand,
-        payment: 'none', status: 'pending',
-        createdAt: Date.now(),
-        ownerUid: auth.currentUser ? auth.currentUser.uid : null
-      };
-
-      try{
-        const docRef = await addDoc(collection(db,'orders'), orderDoc);
-        // decrement stock (naive)
-        for(const it of items){
-          const itemRef = doc(db,'items',it.id);
-          const s = await getDoc(itemRef);
-          if(s.exists()){
-            const cur = s.data();
-            const newStock = Math.max(0, (cur.stock||0) - it.qty);
-            await updateDoc(itemRef, { stock: newStock });
-          }
-        }
-        alert('Order tersimpan! ID: ' + docRef.id);
-        // clear form
-        container.querySelector('#orderName').value = '';
-        rows.innerHTML = ''; addRow(); updateTotal();
-      }catch(e){ console.error(e); alert('Gagal menyimpan: '+e.message); }
-    });
-
-    // Payment flow
-    container.querySelector('#payBtn').addEventListener('click', async ()=>{
-      // 1) must be authenticated to pay (so we can send ID token)
-      if(!auth.currentUser){
-        if(!confirm('Anda harus login untuk melakukan pembayaran. Login sekarang?')) return;
-        location.hash = '#/admin'; // route to auth/login
-        return;
-      }
-
-      // flow: user picks an existing order to pay. We'll present a simple dialog to ask orderId
-      const orderId = prompt('Masukkan Order ID yang ingin dibayar (contoh: doc id dari Firestore):');
-      if(!orderId) return;
-
-      try{
-        // get current ID token
-        const idToken = await auth.currentUser.getIdToken();
-        // call server endpoint to create PaymentIntent
-        const resp = await fetch((SERVER_ORIGIN||'') + '/api/create-payment-intent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + idToken
-          },
-          body: JSON.stringify({ orderId })
-        });
-        if(!resp.ok){
-          const err = await resp.json().catch(()=>({error:resp.statusText}));
-          throw new Error(err.error || resp.statusText);
-        }
-        const { clientSecret } = await resp.json();
-        if(!clientSecret) throw new Error('server tidak mengembalikan clientSecret');
-
-        // Show payment modal with Stripe Elements
-        openPaymentModal(clientSecret, orderId);
-
-      }catch(err){
-        console.error(err);
-        alert('Gagal memulai pembayaran: '+err.message);
-      }
-    });
-
-    // Stripe payment modal (simple)
-    // We'll create elements on demand and confirm payment with card details.
-    function openPaymentModal(clientSecret, orderId){
-      // build modal if missing
-      let modal = document.getElementById('paymentModal');
-      if(!modal){
-        modal = document.createElement('div');
-        modal.id = 'paymentModal';
-        modal.innerHTML = `<div class="modal"><h3>Bayar Order</h3>
-          <div id="card-element"></div>
-          <div id="card-errors" class="small" style="color:#fca5a5;margin-top:8px"></div>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <button id="confirmPay" class="btn">Bayar</button>
-            <button id="closePay" class="btn ghost">Batal</button>
-          </div>
-        </div>`;
-        document.body.appendChild(modal);
-      }
-      modal.style.display = 'flex';
-
-      // create elements
-      const elements = stripe.elements();
-      const style = { base: { color: '#e6eef6', fontSize: '16px', '::placeholder': { color: '#9aa6b2' } } };
-      const card = elements.create('card', { style });
-      card.mount('#card-element');
-
-      modal.querySelector('#closePay').onclick = ()=>{
-        modal.style.display = 'none';
-        card.destroy();
-      };
-
-      modal.querySelector('#confirmPay').onclick = async ()=>{
-        modal.querySelector('#card-errors').textContent = 'Memproses...';
-        try{
-          const result = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: { card }
-          });
-          if(result.error){
-            modal.querySelector('#card-errors').textContent = result.error.message;
-          } else if(result.paymentIntent && result.paymentIntent.status === 'succeeded'){
-            modal.querySelector('#card-errors').textContent = 'Pembayaran berhasil!';
-            // Optionally update order status in client (server webhook will also update)
-            try{
-              await updateDoc(doc(db,'orders', orderId), { status: 'paid', payment: { method: 'card', id: result.paymentIntent.id }, paidAt: serverTimestamp() });
-            }catch(e){ console.warn('Tidak dapat update order client-side:', e.message); }
-            setTimeout(()=>{ modal.style.display='none'; card.destroy(); }, 900);
-          }
-        }catch(e){
-          modal.querySelector('#card-errors').textContent = e.message || 'Error';
-        }
-      };
-    }
-
-  } // end renderForm
-
-  /**************************************************************************
-   * AUTH UI
-   **************************************************************************/
-  function renderAuth(){
-    root.innerHTML = '';
-    const div = document.createElement('div');
-    div.innerHTML = `
-      <h2>Login / Register (Admin)</h2>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input id="email" placeholder="email" style="flex:1"><input id="pass" placeholder="password" type="password" style="flex:1">
-      </div>
-      <div style="margin-top:8px;display:flex;gap:8px">
-        <button id="btnLogin" class="btn">Login</button>
-        <button id="btnReg" class="btn ghost">Register</button>
-      </div>
-      <p class="small muted" style="margin-top:8px">Registrasi publik diperbolehkan — untuk akses admin, buat doc di collection 'admins' (doc id = uid) atau atur sesuai kebutuhan.</p>
-    `;
-    root.appendChild(div);
-
-    div.querySelector('#btnLogin').addEventListener('click', async ()=>{
-      const email = div.querySelector('#email').value;
-      const pw = div.querySelector('#pass').value;
-      try{ await signInWithEmailAndPassword(auth, email, pw); } catch(e){ alert('Login error: '+e.message); }
-    });
-
-    div.querySelector('#btnReg').addEventListener('click', async ()=>{
-      const email = div.querySelector('#email').value;
-      const pw = div.querySelector('#pass').value;
-      try{
-        await createUserWithEmailAndPassword(auth, email, pw);
-        alert('Terdaftar. Tandai user sebagai admin di Firestore jika diperlukan.');
-      }catch(e){ alert('Register error: '+e.message); }
-    });
-  }
-
-  /**************************************************************************
-   * ADMIN UI
-   **************************************************************************/
-  function renderAdmin(){
-    root.innerHTML = '';
-    const container = document.createElement('div');
-    container.className = 'grid';
-    container.innerHTML = `
-      <section>
-        <h2>Admin — Laporan Pesanan</h2>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <input id="search" placeholder="Cari nama / id item" style="flex:1">
-          <select id="filterStatus"><option value="">Semua</option><option value="pending">Pending</option><option value="paid">Paid</option></select>
-        </div>
-        <div id="ordersArea" style="margin-top:10px"></div>
-        <div style="margin-top:8px"><button id="prev" class="btn ghost">Prev</button><button id="next" class="btn ghost">Next</button></div>
-      </section>
-      <aside>
-        <h2>Manajemen Stok</h2>
-        <div id="stockArea" class="small muted">Memuat stok…</div>
-        <div style="margin-top:10px"><button id="seed" class="btn ghost">Seed items if empty</button></div>
-        <div style="margin-top:12px">
-          <h3>Kelola Admin</h3>
-          <input id="assignUid" placeholder="UID untuk jadikan admin"><button id="btnAssign" class="btn ghost">Assign</button>
-        </div>
-      </aside>
-    `;
-    root.appendChild(container);
-
-    const ordersArea = container.querySelector('#ordersArea');
-    const stockArea = container.querySelector('#stockArea');
-
-    let ordersCache = [], perPage = 8, page = 0;
-
-    // live listen orders
-    onSnapshot(collection(db,'orders'), snap=>{
-      ordersCache = []; snap.forEach(d=> ordersCache.push({ id: d.id, ...d.data() }) );
-      renderOrders();
-    });
-
-    function renderOrders(){
-      const q = container.querySelector('#search').value.trim().toLowerCase();
-      const fs = container.querySelector('#filterStatus').value;
-      let filtered = ordersCache.filter(o=>{
-        if(fs && o.status !== fs) return false;
-        if(!q) return true;
-        if((o.name||'').toLowerCase().includes(q)) return true;
-        if(o.items && o.items.some(it=> (it.id||'').toLowerCase().includes(q) || (it.name||'').toLowerCase().includes(q))) return true;
-        return false;
-      });
-      const pages = Math.max(1, Math.ceil(filtered.length/perPage));
-      if(page >= pages) page = pages-1;
-      const start = page*perPage;
-      const slice = filtered.slice(start, start+perPage);
-
-      ordersArea.innerHTML = slice.map(o=>{
-        const itemsTxt = (o.items||[]).map(it=>`${it.id} x${it.qty} @ ${money(it.price)}`).join(', ');
-        return `<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)">
-          <div><strong>${o.name}</strong> <span class="small muted">${o.date} • ${money(o.grand)}</span></div>
-          <div class="small" style="margin-top:6px">${itemsTxt}</div>
-          <div style="margin-top:8px"><button data-id="${o.id}" class="markPaid ok">${o.status==='paid' ? 'Paid' : 'Mark Paid'}</button> <button data-id="${o.id}" class="del danger">Hapus</button></div>
-        </div>`;
-      }).join('');
-
-      // handlers
-      ordersArea.querySelectorAll('.markPaid').forEach(b=> b.addEventListener('click', async ev=>{
-        const id = ev.target.dataset.id;
-        try{ await updateDoc(doc(db,'orders',id), { status: 'paid', paidAt: serverTimestamp() }); alert('Marked paid'); } catch(e){ alert('Err: '+e.message); }
-      }));
-      ordersArea.querySelectorAll('.del').forEach(b=> b.addEventListener('click', async ev=>{
-        const id = ev.target.dataset.id;
-        if(!confirm('Hapus order ini?')) return;
-        try{ await deleteDoc(doc(db,'orders',id)); alert('Deleted'); } catch(e){ alert('Err: '+e.message); }
-      }));
-    }
-
-    container.querySelector('#search').addEventListener('input', ()=>{ page=0; renderOrders(); });
-    container.querySelector('#filterStatus').addEventListener('change', ()=>{ page=0; renderOrders(); });
-    container.querySelector('#prev').addEventListener('click', ()=>{ if(page>0) page--; renderOrders(); });
-    container.querySelector('#next').addEventListener('click', ()=>{ page++; renderOrders(); });
-
-    // stock management (live)
-    onSnapshot(collection(db,'items'), snap=>{
-      stockArea.innerHTML = '';
-      snap.forEach(d=>{
-        const it = d.data();
-        const row = document.createElement('div');
-        row.style.display = 'flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='8px 0';
-        row.innerHTML = `<div><strong>${it.name}</strong><div class="small muted">${money(it.price)}</div></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input style="width:80px" data-id="${d.id}" value="${it.stock}">
-            <button data-id="${d.id}" class="saveStock btn ghost">Simpan</button>
-          </div>`;
-        stockArea.appendChild(row);
-      });
-      // save handlers
-      stockArea.querySelectorAll('.saveStock').forEach(b=> b.addEventListener('click', async ()=>{
-        const id = b.dataset.id;
-        const input = stockArea.querySelector(`input[data-id="${id}"]`);
-        const val = Number(input.value) || 0;
-        try{ await updateDoc(doc(db,'items',id), { stock: val }); alert('Stok tersimpan'); } catch(e){ alert('Err: '+e.message); }
-      }));
-    });
-
-    // seed items
-    container.querySelector('#seed').addEventListener('click', async ()=>{ await seedItemsIfEmpty(); alert('Seed dipicu'); });
-
-    // assign admin UI: write doc to collection 'admins' (docId = uid)
-    container.querySelector('#btnAssign').addEventListener('click', async ()=>{
-      const uid = container.querySelector('#assignUid').value.trim();
-      if(!uid) return alert('Masukkan UID');
-      try{ await setDoc(doc(db,'admins',uid), { role:'admin', assignedAt: serverTimestamp(), assignedBy: auth.currentUser.uid }); alert('Admin assigned'); }
-      catch(e){ alert('Err: '+e.message); }
-    });
-  }
-
-  // react to auth changes
-  onAuthStateChanged(auth, user=>{
-    signBtn.style.display = user ? 'inline-block' : 'none';
-    route();
   });
 
-  // initial render
-  route();
+  const order = await addDoc(collection(db,"orders"),{
+    name,
+    date,
+    items,
+    grand,
+    status:"new",
+    ownerUid:user.uid
+  });
 
-  </script>
+  currentOrderId = order.id;
+  payBtn.style.display = "block";
+  alert("✅ Order disimpan!");
+};
+
+/* ---------------- PEMBAYARAN STRIPE ---------------- */
+const stripe = Stripe("pk_test_xxxxxxxxxxxxxxxxxxxxxxxxx"); // ✅ GANTI PUNYA KAMU
+
+payBtn.onclick = async ()=>{
+  if (!currentOrderId) return alert("Simpan order dulu!");
+
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch("http://localhost:5000/api/create-payment-intent",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+token
+    },
+    body: JSON.stringify({ orderId: currentOrderId })
+  });
+
+  const data = await res.json();
+  const clientSecret = data.clientSecret;
+
+  const { error } = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: { card: { token: "tok_visa" } } // akan otomatis muncul UI
+  });
+
+  if(error) alert("⚠️ " + error.message);
+  else alert("✅ Pembayaran berhasil!");
+};
+
+</script>
 </body>
 </html>
