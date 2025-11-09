@@ -92,9 +92,9 @@ h2 { margin-bottom: 16px; font-size: 1.5rem; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, getDocs } 
-from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
+// Konfigurasi Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
   authDomain: "schesakra.firebaseapp.com",
@@ -109,44 +109,55 @@ const db = getFirestore(app);
 
 const productGrid = document.getElementById("productGrid");
 
-// Load produk/stok barang
+// Fungsi untuk load produk otomatis
 async function loadProducts() {
-  const snapshot = await getDocs(collection(db, "stok"));
-  productGrid.innerHTML = "";
-  if(snapshot.empty){
-    productGrid.innerHTML = "<p>Tidak ada produk saat ini.</p>";
-    return;
+  try {
+    const snapshot = await getDocs(collection(db, "stok"));
+    productGrid.innerHTML = "";
+
+    if(snapshot.empty){
+      productGrid.innerHTML = "<p>Tidak ada produk saat ini.</p>";
+      return;
+    }
+
+    snapshot.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      const card = document.createElement("div");
+      card.classList.add("card");
+
+      // Default image jika tidak ada imageUrl
+      const imageUrl = data.imageUrl || "https://via.placeholder.com/150x150?text=No+Image";
+
+      card.innerHTML = `
+        <img src="${imageUrl}" alt="${data.name}">
+        <h3>${data.name}</h3>
+        <p>Deskripsi: ${data.description || "-"}</p>
+        <p class="price">Rp ${data.price ? data.price.toLocaleString() : "0"}</p>
+        <button>Order Sekarang</button>
+      `;
+
+      // Tombol order menyimpan data ke localStorage
+      const btn = card.querySelector("button");
+      btn.onclick = () => {
+        localStorage.setItem("selectedProduct", JSON.stringify({
+          name: data.name,
+          price: data.price || 0,
+          description: data.description || "",
+          imageUrl: imageUrl
+        }));
+        window.location.href = "order.html";
+      };
+
+      productGrid.appendChild(card);
+    });
+
+  } catch (error) {
+    console.error("Error load produk:", error);
+    productGrid.innerHTML = "<p>Gagal memuat produk. Silakan coba lagi.</p>";
   }
-
-  snapshot.docs.forEach(docSnap=>{
-    const data = docSnap.data();
-    const card = document.createElement("div");
-    card.classList.add("card");
-    const imageUrl = data.imageUrl || "https://via.placeholder.com/150x150?text=No+Image";
-    card.innerHTML = `
-      <img src="${imageUrl}" alt="${data.name}">
-      <h3>${data.name}</h3>
-      <p>Deskripsi: ${data.description || "-"}</p>
-      <p class="price">Rp ${data.price.toLocaleString()}</p>
-      <button>Order Sekarang</button>
-    `;
-    const btn = card.querySelector("button");
-    btn.onclick = () => {
-      // Simpan produk yang dipilih ke localStorage agar otomatis muncul di order.html
-      localStorage.setItem("selectedProduct", JSON.stringify({
-        name: data.name,
-        price: data.price,
-        description: data.description || "",
-        imageUrl: imageUrl
-      }));
-      // Arahkan ke order.html
-      window.location.href = "order.html";
-    };
-
-    productGrid.appendChild(card);
-  });
 }
 
+// Jalankan load produk saat halaman dibuka
 loadProducts();
 </script>
 
