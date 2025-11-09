@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Form Order + Pembayaran</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- Kalender -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f6f9fc;
+  padding: 20px;
+}
+.container {
+  max-width: 550px;
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+button {
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+button:hover {
+  background: #2563eb;
+}
+table { width: 100%; margin-top: 8px; }
+td { padding: 4px; }
+.total-box {
+  font-size: 1.3rem;
+  text-align: right;
+  margin-top: 12px;
+  font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>Form Order</h2>
+
+<label>Nama Pemesan</label>
+<input id="name" placeholder="Nama lengkap" />
+
+<label>Tanggal</label>
+<input id="date" placeholder="Pilih tanggal" />
+
+<hr>
+
+<h3>Item</h3>
+<table>
+<thead>
+<tr><th>Nama</th><th>Qty</th><th>Harga</th></tr>
+</thead>
+<tbody id="items-body"></tbody>
+</table>
+
+<button id="add-item">+ Tambah Item</button>
+
+<div class="total-box">
+Total: Rp <span id="grand">0</span>
+</div>
+
+<hr>
+
+<button id="saveOrder">Simpan Order</button>
+<button id="payButton" style="display:none; margin-top:14px;">Bayar Sekarang</button>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+import { getFirestore, collection, addDoc } 
+from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  projectId: "schesakra",
+  storageBucket: "schesakra.firebasestorage.app",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318",
+  measurementId: "G-Q7HSM1LK98"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ✅ Kalender aktif
+flatpickr("#date", { dateFormat: "Y-m-d" });
+
+// ✅ Tambah row item
+const itemsBody = document.getElementById("items-body");
+
+function addItemRow(){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input class="item-name" placeholder="Nama barang"></td>
+    <td><input class="item-qty" type="number" value="1" min="1"></td>
+    <td><input class="item-price" type="number" placeholder="Harga"></td>
+  `;
+  itemsBody.appendChild(tr);
+
+  tr.querySelector(".item-qty").oninput = updateTotal;
+  tr.querySelector(".item-price").oninput = updateTotal;
+}
+
+document.getElementById("add-item").onclick = addItemRow;
+addItemRow(); // pertama kali
+
+// ✅ Hitung total
+function updateTotal(){
+  let t=0;
+  document.querySelectorAll("#items-body tr").forEach(tr=>{
+    const q = Number(tr.querySelector(".item-qty").value);
+    const p = Number(tr.querySelector(".item-price").value);
+    if(q>0 && p>0) t+=q*p;
+  });
+  document.getElementById("grand").textContent = t.toLocaleString();
+}
+
+// ✅ Simpan order
+let currentOrderId=null;
+
+document.getElementById("saveOrder").onclick = async ()=>{
+  const name=document.getElementById("name").value;
+  const date=document.getElementById("date").value;
+  const items=[];
+  let grand=0;
+
+  document.querySelectorAll("#items-body tr").forEach(tr=>{
+    const nm=tr.querySelector(".item-name").value;
+    const q=Number(tr.querySelector(".item-qty").value);
+    const p=Number(tr.querySelector(".item-price").value);
+    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+  });
+
+  const docRef=await addDoc(collection(db,"orders"),{
+    name,date,items,grand,status:"unpaid"
+  });
+
+  currentOrderId=docRef.id;
+  document.getElementById("payButton").style.display="block";
+  alert("✅ Order tersimpan!");
+};
+
+  document.getElementById("payButton").onclick = ()=>{
+  if(!currentOrderId){
+    alert("Order belum disimpan!");
+    return;
+  }
+
+  localStorage.setItem("selectedOrderId", currentOrderId);
+  window.location.href = "order_pay.html";
+};
+
+</script>
+
+</body>
+</html>
