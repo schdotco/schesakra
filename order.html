@@ -5,20 +5,84 @@
 <title>Form Order + Pembayaran</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+<!-- Kalender -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
-body { font-family: Arial, sans-serif; background:#f6f9fc; padding:20px; }
-.container { max-width: 550px; margin:auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-input, select, button { width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid #ccc; }
-button { background:#3b82f6; color:white; cursor:pointer; transition:0.2s; }
-button:hover { background:#2563eb; }
-table { width:100%; margin-top:8px; }
-td { padding:4px; }
-.total-box { font-size:1.3rem; text-align:right; margin-top:12px; font-weight:bold; }
+body {
+  font-family: Arial, sans-serif;
+  background: #f6f9fc;
+  padding: 12px;
+  margin: 0;
+}
+
+.container {
+  max-width: 550px;
+  width: 100%;
+  margin: auto;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+h2 { font-size: 1.6rem; margin-bottom: 12px; }
+h3 { font-size: 1.2rem; margin-top: 16px; }
+
+input, select, button {
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+button {
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 16px;
+}
+
+button:hover {
+  background: #2563eb;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+td, th {
+  padding: 6px;
+  text-align: left;
+}
+
+.total-box {
+  font-size: 1.3rem;
+  text-align: right;
+  margin-top: 12px;
+  font-weight: bold;
+}
+
+/* Media Query untuk layar kecil */
+@media (max-width: 480px) {
+  h2 { font-size: 1.4rem; }
+  h3 { font-size: 1.1rem; }
+  .total-box { font-size: 1.1rem; }
+  input, button { padding: 10px; font-size: 15px; }
+}
 </style>
 </head>
+
 <body>
 <div class="container">
 
@@ -33,17 +97,19 @@ td { padding:4px; }
 <hr>
 
 <h3>Item</h3>
-<table>
-<thead>
-<tr><th>Nama</th><th>Qty</th><th>Harga</th></tr>
-</thead>
-<tbody id="items-body"></tbody>
-</table>
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr><th>Nama</th><th>Qty</th><th>Harga</th></tr>
+    </thead>
+    <tbody id="items-body"></tbody>
+  </table>
+</div>
 
 <button id="add-item">+ Tambah Item</button>
 
 <div class="total-box">
-Total: Rp <span id="grand">0</span>
+  Total: Rp <span id="grand">0</span>
 </div>
 
 <hr>
@@ -55,7 +121,7 @@ Total: Rp <span id="grand">0</span>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } 
+import { getFirestore, collection, addDoc } 
 from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -71,58 +137,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Kalender
+// Kalender aktif
 flatpickr("#date", { dateFormat: "Y-m-d" });
-
-// Load stok barang dari Firebase
-let stokBarang = [];
-async function loadStok(){
-  const snapshot = await getDocs(collection(db, "stok"));
-  stokBarang = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
 
 // Tambah row item
 const itemsBody = document.getElementById("items-body");
 
-function createItemOptions(){
-  let options = `<option value="">Pilih barang</option>`;
-  stokBarang.forEach(s => {
-    options += `<option value="${s.id}" data-price="${s.price}">${s.name}</option>`;
-  });
-  return options;
-}
-
 function addItemRow(){
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td>
-      <select class="item-name">
-        ${createItemOptions()}
-      </select>
-    </td>
+    <td><input class="item-name" placeholder="Nama barang"></td>
     <td><input class="item-qty" type="number" value="1" min="1"></td>
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
   itemsBody.appendChild(tr);
-
-  const selectEl = tr.querySelector(".item-name");
-  const priceEl = tr.querySelector(".item-price");
-
-  selectEl.onchange = () => {
-    const selected = selectEl.options[selectEl.selectedIndex];
-    priceEl.value = selected.dataset.price || 0;
-    updateTotal();
-  };
 
   tr.querySelector(".item-qty").oninput = updateTotal;
   tr.querySelector(".item-price").oninput = updateTotal;
 }
 
 document.getElementById("add-item").onclick = addItemRow;
+addItemRow(); // pertama kali
 
 // Hitung total
 function updateTotal(){
-  let t = 0;
+  let t=0;
   document.querySelectorAll("#items-body tr").forEach(tr=>{
     const q = Number(tr.querySelector(".item-qty").value);
     const p = Number(tr.querySelector(".item-price").value);
@@ -133,31 +172,25 @@ function updateTotal(){
 
 // Simpan order
 let currentOrderId=null;
+
 document.getElementById("saveOrder").onclick = async ()=>{
-  const name = document.getElementById("name").value;
-  const date = document.getElementById("date").value;
-  const items = [];
-  let grand = 0;
+  const name=document.getElementById("name").value;
+  const date=document.getElementById("date").value;
+  const items=[];
+  let grand=0;
 
   document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const sel = tr.querySelector(".item-name");
-    const itemId = sel.value;
-    const itemName = sel.options[sel.selectedIndex].text;
-    const q = Number(tr.querySelector(".item-qty").value);
-    const p = Number(tr.querySelector(".item-price").value);
-    if(itemId && q>0 && p>0){
-      items.push({ id:itemId, nm:itemName, q, p });
-      grand += q*p;
-    }
+    const nm=tr.querySelector(".item-name").value;
+    const q=Number(tr.querySelector(".item-qty").value);
+    const p=Number(tr.querySelector(".item-price").value);
+    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
   });
 
-  if(!name || !date || items.length==0) return alert("Lengkapi data order!");
-
-  const docRef = await addDoc(collection(db,"orders"),{
-    name, date, items, grand, status:"unpaid"
+  const docRef=await addDoc(collection(db,"orders"),{
+    name,date,items,grand,status:"unpaid"
   });
 
-  currentOrderId = docRef.id;
+  currentOrderId=docRef.id;
   document.getElementById("payButton").style.display="block";
   alert("✅ Order tersimpan!");
 };
@@ -172,10 +205,7 @@ document.getElementById("payButton").onclick = ()=>{
   window.location.href = "order_pay.html";
 };
 
-// Load stok terlebih dahulu sebelum add row pertama
-await loadStok();
-addItemRow();
-
 </script>
+
 </body>
 </html>
