@@ -10,43 +10,14 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f6f9fc;
-  padding: 20px;
-}
-.container {
-  max-width: 550px;
-  margin: auto;
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-input, select, button {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-button {
-  background: #3b82f6;
-  color: white;
-  cursor: pointer;
-  transition: 0.2s;
-}
-button:hover {
-  background: #2563eb;
-}
+body { font-family: Arial, sans-serif; background: #f6f9fc; padding: 20px; }
+.container { max-width: 550px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+input, select, button { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; }
+button { background: #3b82f6; color: white; cursor: pointer; transition: 0.2s; }
+button:hover { background: #2563eb; }
 table { width: 100%; margin-top: 8px; }
 td { padding: 4px; }
-.total-box {
-  font-size: 1.3rem;
-  text-align: right;
-  margin-top: 12px;
-  font-weight: bold;
-}
+.total-box { font-size: 1.3rem; text-align: right; margin-top: 12px; font-weight: bold; }
 </style>
 </head>
 
@@ -86,8 +57,7 @@ Total: Rp <span id="grand">0</span>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc } 
-from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
@@ -102,29 +72,62 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ Kalender aktif
+// Kalender
 flatpickr("#date", { dateFormat: "Y-m-d" });
 
-// ✅ Tambah row item
-const itemsBody = document.getElementById("items-body");
+// Ambil data stok barang dari Firebase
+let stokItems = [];
+async function loadStok(){
+  const snapshot = await getDocs(collection(db, "stok"));
+  stokItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+await loadStok();
 
+// Tambah row item
+const itemsBody = document.getElementById("items-body");
 function addItemRow(){
   const tr = document.createElement("tr");
+
+  // buat dropdown nama barang
+  let options = '<option value="">Pilih barang</option>';
+  stokItems.forEach(item => {
+    options += `<option value="${item.id}" data-price="${item.harga}">${item.nama}</option>`;
+  });
+
   tr.innerHTML = `
-    <td><input class="item-name" placeholder="Nama barang"></td>
+    <td>
+      <select class="item-name">
+        ${options}
+      </select>
+    </td>
     <td><input class="item-qty" type="number" value="1" min="1"></td>
     <td><input class="item-price" type="number" placeholder="Harga"></td>
   `;
+
   itemsBody.appendChild(tr);
 
-  tr.querySelector(".item-qty").oninput = updateTotal;
-  tr.querySelector(".item-price").oninput = updateTotal;
+  const select = tr.querySelector(".item-name");
+  const priceInput = tr.querySelector(".item-price");
+  const qtyInput = tr.querySelector(".item-qty");
+
+  // ketika pilih barang, otomatis set harga
+  select.onchange = () => {
+    const selected = stokItems.find(i => i.id === select.value);
+    if(selected){
+      priceInput.value = selected.harga;
+    } else {
+      priceInput.value = "";
+    }
+    updateTotal();
+  };
+
+  qtyInput.oninput = updateTotal;
+  priceInput.oninput = updateTotal;
 }
-
 document.getElementById("add-item").onclick = addItemRow;
-addItemRow(); // pertama kali
+addItemRow();
 
-// ✅ Hitung total
+// Hitung total
 function updateTotal(){
   let t=0;
   document.querySelectorAll("#items-body tr").forEach(tr=>{
@@ -135,9 +138,8 @@ function updateTotal(){
   document.getElementById("grand").textContent = t.toLocaleString();
 }
 
-// ✅ Simpan order
+// Simpan order
 let currentOrderId=null;
-
 document.getElementById("saveOrder").onclick = async ()=>{
   const name=document.getElementById("name").value;
   const date=document.getElementById("date").value;
@@ -145,31 +147,34 @@ document.getElementById("saveOrder").onclick = async ()=>{
   let grand=0;
 
   document.querySelectorAll("#items-body tr").forEach(tr=>{
-    const nm=tr.querySelector(".item-name").value;
-    const q=Number(tr.querySelector(".item-qty").value);
-    const p=Number(tr.querySelector(".item-price").value);
-    if(nm&&q>0&&p>0){ items.push({nm,q,p}); grand+=q*p; }
+    const nmSelect = tr.querySelector(".item-name");
+    const selectedItem = stokItems.find(i=>i.id===nmSelect.value);
+    const q = Number(tr.querySelector(".item-qty").value);
+    const p = Number(tr.querySelector(".item-price").value);
+    if(selectedItem && q>0 && p>0){
+      items.push({ nm:selectedItem.nama, q, p });
+      grand += q*p;
+    }
   });
 
-  const docRef=await addDoc(collection(db,"orders"),{
+  const docRef = await addDoc(collection(db,"orders"),{
     name,date,items,grand,status:"unpaid"
   });
 
-  currentOrderId=docRef.id;
+  currentOrderId = docRef.id;
   document.getElementById("payButton").style.display="block";
   alert("✅ Order tersimpan!");
 };
 
-  document.getElementById("payButton").onclick = ()=>{
+// Bayar sekarang
+document.getElementById("payButton").onclick = ()=>{
   if(!currentOrderId){
     alert("Order belum disimpan!");
     return;
   }
-
   localStorage.setItem("selectedOrderId", currentOrderId);
   window.location.href = "order_pay.html";
 };
-
 </script>
 
 </body>
