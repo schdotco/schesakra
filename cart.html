@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keranjang Belanja</title>
+
+<style>
+  body{font-family:Arial, sans-serif;background:#f6f8fa;margin:0;padding:0}
+  .container{max-width:900px;margin:30px auto;padding:0 18px}
+  h1{margin-bottom:18px}
+  table{width:100%;border-collapse:collapse;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-radius:10px;overflow:hidden}
+  th,td{padding:12px;border-bottom:1px solid #f0f0f0;text-align:left}
+  th{background:#fafafa;font-weight:600}
+  img{width:80px;height:60px;object-fit:cover;border-radius:8px}
+  .qty-btn{padding:4px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:14px}
+  .total-box{margin-top:18px;padding:18px;background:#fff;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center}
+  .checkout-btn{padding:12px 18px;border-radius:8px;background:#c4553b;color:#fff;font-weight:bold;border:0;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Keranjang Belanja</h1>
+
+  <table id="cartTable">
+    <thead>
+      <tr>
+        <th>Produk</th>
+        <th>Harga</th>
+        <th>Qty</th>
+        <th>Subtotal</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="total-box">
+    <div style="font-size:18px">Total: <strong id="totalPrice">Rp 0</strong></div>
+    <button class="checkout-btn" id="checkoutBtn">Checkout</button>
+  </div>
+</div>
+
+<script>
+  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  const tbody = document.querySelector("#cartTable tbody");
+  const totalEl = document.getElementById("totalPrice");
+
+  function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+
+  function renderCart(){
+    tbody.innerHTML = cart.map(item=>`
+      <tr>
+        <td><img src="${item.img}"> ${item.title}</td>
+        <td>Rp ${numberWithCommas(item.price)}</td>
+        <td>
+          <button class="qty-btn" onclick="changeQty(${item.id},-1)">-</button>
+          ${item.qty}
+          <button class="qty-btn" onclick="changeQty(${item.id},1)">+</button>
+        </td>
+        <td>Rp ${numberWithCommas(item.price * item.qty)}</td>
+        <td><button class="qty-btn" onclick="removeItem(${item.id})">X</button></td>
+      </tr>
+    `).join('');
+
+    totalEl.textContent = "Rp " + numberWithCommas(cart.reduce((s,i)=>s+(i.price*i.qty),0));
+  }
+
+  function changeQty(id,delta){
+    const index = cart.findIndex(i=>i.id===id);
+    if(index>=0){
+      cart[index].qty += delta;
+      if(cart[index].qty<=0) cart.splice(index,1);
+      save();
+    }
+  }
+
+  function removeItem(id){
+    cart = cart.filter(i=>i.id!==id);
+    save();
+  }
+
+  function save(){
+    localStorage.setItem("cart", JSON.stringify(cart));
+    renderCart();
+  }
+
+  document.getElementById("checkoutBtn").onclick = ()=>{
+    alert("Silakan lanjutkan ke proses pemesanan via WhatsApp.");
+    // Bisa diarahkan ke WA:
+    // window.location.href = `https://wa.me/628xxxx?text=Saya ingin pesan: ...`
+  };
+
+  renderCart();
+</script>
+
+</body>
+</html>
