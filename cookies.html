@@ -100,15 +100,10 @@
   <button id="closeCart" class="checkout-btn" style="background:#777;margin-top:10px;">Tutup</button>
 </div>
 
-<!-- Firebase & PDF -->
-<script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <script type="module">
 /* Firebase */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getDatabase, push, ref, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
@@ -122,7 +117,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 /* Products */
 const products = [
@@ -130,8 +124,8 @@ const products = [
   {id:2,title:"Cheese Pastry Stick Box",price:35000,img:"https://via.placeholder.com/600x800?text=Cheese+Pastry"},
 ];
 
+/* Render Product */
 const productsGrid=document.getElementById("productsGrid");
-
 function renderProducts(){
   productsGrid.innerHTML = products.map(p=>`
     <div class="product">
@@ -150,7 +144,7 @@ function renderProducts(){
 }
 renderProducts();
 
-/* Cart Logic */
+/* CART */
 function getCart(){return JSON.parse(localStorage.getItem("cart")||"[]");}
 function saveCart(c){localStorage.setItem("cart",JSON.stringify(c));}
 
@@ -161,63 +155,56 @@ function addToCart(p){
 
 function updateCartUI(){
   const c = getCart();
-  
-  // ✅ KEMBALIKAN PERHITUNGAN JUMLAH ITEM DI BADGE
   document.getElementById("cartBtn").textContent = `Keranjang (${c.reduce((s,i)=>s+i.qty,0)})`;
-
   document.getElementById("cartItems").innerHTML =
-    c.length > 0
-      ? c.map(i => `
-          <div class="cart-item">
-            <img src="${i.img}">
-            <div style="flex:1;">
-              ${i.title}<br>
-              <small>${i.qty} x Rp ${i.price.toLocaleString()}</small><br>
-              <b>Rp ${(i.qty * i.price).toLocaleString()}</b>
-            </div>
-          </div>
-        `).join("")
-      : "Keranjang kosong";
+    c.length ? c.map(i=>`
+      <div class="cart-item">
+        <img src="${i.img}">
+        <div style="flex:1;">
+          ${i.title}<br>
+          <small>${i.qty} x Rp ${i.price.toLocaleString()}</small><br>
+          <b>Rp ${(i.qty*i.price).toLocaleString()}</b>
+        </div>
+      </div>
+    `).join("") : "Keranjang kosong";
 }
-
 updateCartUI();
 
 document.getElementById("cartBtn").onclick=()=>document.getElementById("cartDrawer").classList.add("open");
 document.getElementById("closeCart").onclick=()=>document.getElementById("cartDrawer").classList.remove("open");
 
-/* Checkout WhatsApp + PDF */
+/* CHECKOUT */
 document.getElementById("checkoutBtn").onclick=async()=>{
-  const cart=getCart();const name=custName.value;const phone=custPhone.value;const addr=custAddr.value;const note=custNote.value;
-  const now=new Date();const inv=`INV-${now.getTime()}`;
+  const cart=getCart();
+  const name=custName.value.trim(), phone=custPhone.value.trim(), addr=custAddr.value.trim(), note=custNote.value.trim();
+  if(!name||!phone||!addr) return alert("Mohon isi nama, telepon, dan alamat.");
+
+  const now=new Date();
+  const inv=`INV-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getTime()).slice(-6)}`;
+  const tgl=now.toLocaleDateString("id-ID",{day:"2-digit",month:"long",year:"numeric"});
   const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
+  const totalItems=cart.reduce((s,i)=>s+i.qty,0);
 
-// Format sesuai admin dashboard
-const order = {
-  invoiceNo: inv,
-  createdAt: now.toISOString(),
-  customer: {
-    name: name,
-    phone: phone,
-    address: addr,
-    note: note || "-"
-  },
-  items: cart.map(i => ({
-    id: i.id,
-    title: i.title,
-    price: i.price,
-    qty: i.qty,
-    lineTotal: i.qty * i.price
-  })),
-  subtotal: total,
-  shipping: 0,
-  total: total,
-  status: "pending"
-};
+  const order = {
+    invoiceNo: inv,
+    createdAt: now.toISOString(),
+    customer: { name, phone, address: addr, note: note || "-" },
+    items: cart.map(i=>({title:i.title,price:i.price,qty:i.qty,lineTotal:i.qty*i.price})),
+    subtotal: total,
+    shipping: 0,
+    total,
+    status: "pending"
+  };
 
-await set(push(ref(db,"orders")), order);
+  await set(push(ref(db,"orders")),order);
 
-  const message=`Halo, saya ingin pesan.%0AInvoice: ${inv}%0A${cart.map(i=>`${i.qty} x ${i.title}`).join(", ")}%0ATotal: Rp ${total.toLocaleString()}%0AAlamat: ${encodeURIComponent(addr)}`;
-  window.open(`https://wa.me/62816772145?text=${message}`,"_blank");
+  let wa=`Tanggal: ${tgl}%0AInvoice: ${inv}%0ANama Pemesan: ${encodeURIComponent(name)}%0A%0A`;
+  wa+=`Daftar Pesanan:%0A`;
+  cart.forEach(i=>wa+=`${i.qty} x ${encodeURIComponent(i.title)} = Rp ${(i.qty*i.price).toLocaleString()}%0A`);
+  wa+=`%0ATotal item: ${totalItems} pcs%0ASubtotal: Rp ${total.toLocaleString()}%0ACatatan: ${encodeURIComponent(note||"-")}%0A(Ongkir belum termasuk)%0A`;
+
+  const waURL=`https://wa.me/62816772145?text=${wa}`;
+  window.open(waURL,"_blank");
 
   localStorage.removeItem("cart");updateCartUI();
   document.getElementById("cartDrawer").classList.remove("open");
