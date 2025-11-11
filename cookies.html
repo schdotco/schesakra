@@ -160,10 +160,26 @@ function addToCart(p){
 }
 
 function updateCartUI(){
-  const c=getCart();document.getElementById("cartBtn").textContent=`Keranjang (${c.reduce((a,b)=>a+b.qty,0)})`;
-  document.getElementById("cartItems").innerHTML=
-    c.map(i=>`<div class="cart-item"><img src="${i.img}"><div>${i.title}<br>Rp ${(i.qty*i.price).toLocaleString()}</div></div>`).join("")||"Keranjang kosong";
+  const c = getCart();
+  
+  // ✅ KEMBALIKAN PERHITUNGAN JUMLAH ITEM DI BADGE
+  document.getElementById("cartBtn").textContent = `Keranjang (${c.reduce((s,i)=>s+i.qty,0)})`;
+
+  document.getElementById("cartItems").innerHTML =
+    c.length > 0
+      ? c.map(i => `
+          <div class="cart-item">
+            <img src="${i.img}">
+            <div style="flex:1;">
+              ${i.title}<br>
+              <small>${i.qty} x Rp ${i.price.toLocaleString()}</small><br>
+              <b>Rp ${(i.qty * i.price).toLocaleString()}</b>
+            </div>
+          </div>
+        `).join("")
+      : "Keranjang kosong";
 }
+
 updateCartUI();
 
 document.getElementById("cartBtn").onclick=()=>document.getElementById("cartDrawer").classList.add("open");
