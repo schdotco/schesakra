@@ -67,7 +67,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
   authDomain: "schesakra.firebaseapp.com",
@@ -81,94 +80,77 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// UI refs
-const orderTable = document.getElementById("orderTable");
-const searchInput = document.getElementById("searchInput");
-const dateStart = document.getElementById("dateFilterStart");
-const dateEnd = document.getElementById("dateFilterEnd");
-const applyFilterBtn = document.getElementById("applyFilter");
-const clearFilterBtn = document.getElementById("clearFilter");
-const modal = document.getElementById("orderModal");
-const detailContent = document.getElementById("detailContent");
-const closeModal = document.getElementById("closeModal");
+const orderTable=document.getElementById("orderTable");
+const searchInput=document.getElementById("searchInput");
+const dateStart=document.getElementById("dateFilterStart");
+const dateEnd=document.getElementById("dateFilterEnd");
+const applyFilterBtn=document.getElementById("applyFilter");
+const clearFilterBtn=document.getElementById("clearFilter");
+const modal=document.getElementById("orderModal");
+const detailContent=document.getElementById("detailContent");
+const closeModal=document.getElementById("closeModal");
 
-let orders = [];
+let orders=[];
 
-// Fetch orders live
-onValue(ref(db, "orders"), snapshot => {
-  orders = [];
-  snapshot.forEach(s => orders.push(s.val()));
+onValue(ref(db,"orders"),snap=>{
+  orders=[];
+  snap.forEach(s=>orders.push(s.val()));
   renderTable();
 });
 
-// Format helper
 function fmt(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,".");}
 
-// Render table
 function renderTable(){
-  let filtered = orders;
+  let f=[...orders];
 
   // Search
-  const q = searchInput.value.toLowerCase();
+  const q=searchInput.value.toLowerCase();
   if(q){
-    filtered = filtered.filter(o =>
-      o.invoiceNo.toLowerCase().includes(q) ||
-      o.customer.name.toLowerCase().includes(q)
+    f=f.filter(o=>
+      (o.invoiceNo||o.inv||"").toLowerCase().includes(q) ||
+      (o.customer?.name || o.name || "").toLowerCase().includes(q)
     );
   }
 
   // Date filter
-  if(dateStart.value){
-    filtered = filtered.filter(o => new Date(o.createdAt) >= new Date(dateStart.value));
-  }
-  if(dateEnd.value){
-    filtered = filtered.filter(o => new Date(o.createdAt) <= new Date(dateEnd.value+"T23:59"));
-  }
+  if(dateStart.value) f=f.filter(o=>new Date(o.createdAt||o.time)>=new Date(dateStart.value));
+  if(dateEnd.value) f=f.filter(o=>new Date(o.createdAt||o.time)<=new Date(dateEnd.value+"T23:59"));
 
-  orderTable.innerHTML = filtered.map(o=>`
+  orderTable.innerHTML=f.map(o=>`
     <tr>
-      <td>${new Date(o.createdAt).toLocaleDateString()}</td>
-      <td>${o.invoiceNo}</td>
-      <td>${o.customer.name}</td>
-      <td>Rp ${fmt(o.total)}</td>
-      <td>${o.status}</td>
-      <td><button class="btn" data-id="${o.invoiceNo}">Detail</button></td>
+      <td>${new Date(o.createdAt||o.time).toLocaleDateString()}</td>
+      <td>${o.invoiceNo||o.inv}</td>
+      <td>${o.customer?.name || o.name}</td>
+      <td>Rp ${fmt(o.total||o.subtotal)}</td>
+      <td>${o.status || "pending"}</td>
+      <td><button class="btn" data-id="${o.invoiceNo||o.inv}">Detail</button></td>
     </tr>
   `).join("");
 
-  document.querySelectorAll("button[data-id]").forEach(btn=>{
-    btn.onclick = ()=> showDetail(btn.dataset.id);
-  });
+  document.querySelectorAll("button[data-id]").forEach(b=>b.onclick=()=>showDetail(b.dataset.id));
 }
 
-// Show modal detail
 function showDetail(inv){
-  const o = orders.find(x=>x.invoiceNo === inv);
-  detailContent.innerHTML = `
-    <p><b>Invoice:</b> ${o.invoiceNo}</p>
-    <p><b>Tanggal:</b> ${new Date(o.createdAt).toLocaleString()}</p>
-    <p><b>Nama:</b> ${o.customer.name}</p>
-    <p><b>Telepon:</b> ${o.customer.phone}</p>
-    <p><b>Alamat:</b> ${o.customer.address}</p>
+  const o=orders.find(x=>x.invoiceNo===inv||x.inv===inv);
+  const items = o.items || o.cart || [];
+  detailContent.innerHTML=`
+    <p><b>Invoice:</b> ${o.invoiceNo||o.inv}</p>
+    <p><b>Tanggal:</b> ${new Date(o.createdAt||o.time).toLocaleString()}</p>
+    <p><b>Nama:</b> ${o.customer?.name||o.name}</p>
+    <p><b>Telepon:</b> ${o.customer?.phone||o.phone}</p>
+    <p><b>Alamat:</b> ${o.customer?.address||o.addr}</p>
     <hr>
     <h4>Items:</h4>
-    ${o.items.map(i=>`${i.qty} x ${i.title} = Rp ${fmt(i.lineTotal)}<br>`).join("")}
+    ${items.map(i=>`${i.qty} x ${i.title} = Rp ${fmt(i.lineTotal || (i.qty*i.price))}<br>`).join("")}
     <hr>
-    <p><b>Total:</b> Rp ${fmt(o.total)}</p>
+    <p><b>Total:</b> Rp ${fmt(o.total||o.subtotal)}</p>
   `;
   modal.classList.add("open");
 }
 
-closeModal.onclick = ()=> modal.classList.remove("open");
-applyFilterBtn.onclick = renderTable;
-clearFilterBtn.onclick = ()=>{
-  searchInput.value = "";
-  dateStart.value = "";
-  dateEnd.value = "";
-  renderTable();
-};
-
+closeModal.onclick=()=>modal.classList.remove("open");
+applyFilterBtn.onclick=renderTable;
+clearFilterBtn.onclick=()=>{searchInput.value="";dateStart.value="";dateEnd.value="";renderTable();};
 </script>
-
 </body>
 </html>
