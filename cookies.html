@@ -67,6 +67,33 @@
     footer{margin-top:28px;padding:18px 0;text-align:center;color:var(--muted);font-size:14px}
     /* small helpers */
     .muted{color:var(--muted);font-size:13px}
+
+    /* CART DRAWER */
+    .cart-drawer {
+      position:fixed;
+      right:0;
+      top:0;
+      height:100vh;
+      width:420px;
+      max-width:100%;
+      transform:translateX(110%);
+      transition:transform .28s ease;
+      z-index:1200;
+      padding:22px;
+      box-shadow: -20px 0 40px rgba(12,20,40,0.12);
+      background:var(--card);
+      overflow:auto;
+    }
+    .cart-drawer.open { transform:translateX(0); }
+    .cart-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+    .cart-items {display:flex;flex-direction:column;gap:12px}
+    .cart-item {display:flex;gap:12px;align-items:center;border-radius:10px;padding:8px;border:1px solid #f0f2f5}
+    .cart-item img{width:72px;height:56px;object-fit:cover;border-radius:8px}
+    .qty-controls{display:flex;gap:6px;align-items:center}
+    .small{font-size:13px;color:var(--muted)}
+    .summary{margin-top:12px;border-top:1px dashed #eef2f5;padding-top:12px}
+    .checkout-form input, .checkout-form textarea {width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px}
+    .muted-note{font-size:13px;color:var(--muted);margin-top:8px}
   </style>
 </head>
 <body>
@@ -131,9 +158,9 @@
           <h3 style="margin:0 0 10px">Kontak / Pesan</h3>
           <div class="muted">Isi formulir singkat untuk pemesanan.</div>
           <div style="margin-top:8px">
-            <input placeholder="Nama" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
-            <input placeholder="Telepon" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
-            <textarea placeholder="Pesan singkat" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef"></textarea>
+            <input id="quickNama" placeholder="Nama" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
+            <input id="quickTelp" placeholder="Telepon" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
+            <textarea id="quickPesan" placeholder="Pesan singkat" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef"></textarea>
             <div style="margin-top:8px"><button class="btn primary">Kirim</button></div>
           </div>
         </div>
@@ -173,8 +200,67 @@
     </footer>
   </div>
 
-  <script>
-    // Sample data (ganti dengan data nyata/loop server)
+  <!-- CART DRAWER -->
+  <aside id="cartDrawer" class="cart-drawer" aria-hidden="true">
+    <div class="cart-header">
+      <div>
+        <h3 style="margin:0">Keranjang Anda</h3>
+        <div class="small muted-note" id="cartCountText">0 item</div>
+      </div>
+      <div>
+        <button class="btn" id="closeCart">Tutup</button>
+      </div>
+    </div>
+
+    <div class="cart-items" id="cartItems"></div>
+
+    <div class="summary">
+      <div style="display:flex;justify-content:space-between"><div class="small">Subtotal</div><div id="subtotalText">Rp 0</div></div>
+      <div style="display:flex;justify-content:space-between"><div class="small">Ongkir</div><div id="shippingText">Rp 0</div></div>
+      <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:8px"><div>Total</div><div id="totalText">Rp 0</div></div>
+
+      <div style="margin-top:12px">
+        <h4 style="margin:8px 0 6px">Formulir Checkout</h4>
+        <form id="checkoutForm" class="checkout-form" onsubmit="return false;">
+          <input id="custName" placeholder="Nama lengkap" required />
+          <input id="custPhone" placeholder="Nomor telepon" required />
+          <input id="custAddress" placeholder="Alamat pengiriman" required />
+          <textarea id="custNote" placeholder="Catatan (opsional)"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="saveDraft">Simpan Draft</button>
+            <button class="btn primary" id="checkoutBtn">Checkout & Kirim WA</button>
+          </div>
+        </form>
+        <div class="muted-note">Setelah checkout, pesanan akan tersimpan di Firebase dan Anda akan diarahkan ke WhatsApp untuk konfirmasi/pembayaran.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Firebase + App Logic -->
+  <script type="module">
+    // -------------------------
+    // Firebase initialization (modular v9)
+    // -------------------------
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+      authDomain: "schesakra.firebaseapp.com",
+      databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "schesakra",
+      storageBucket: "schesakra.firebasestorage.app",
+      messagingSenderId: "672537227977",
+      appId: "1:672537227977:web:88b24f905c86eba7c05318",
+      measurementId: "G-Q7HSM1LK98"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // -------------------------
+    // Existing product code (kept, hanya sedikit integrasi ke cart)
+    // -------------------------
     const products = [
       {id:1,title:"Almond Bar Cookies",price:80000,tag:["manis"],img:"https://via.placeholder.com/600x400?text=Almond+Bar"},
       {id:2,title:"Cheese Pastry Stick Box",price:35000,tag:["keju"],img:"https://via.placeholder.com/600x400?text=Cheese+Stick"},
@@ -202,11 +288,13 @@
       maxPrice: null
     };
 
+    // Elements
     const productsGrid = document.getElementById('productsGrid');
     const resultCount = document.getElementById('resultCount');
     const pagination = document.getElementById('pagination');
     const cartBtn = document.getElementById('cart-btn');
 
+    // Render products (kept dari file asli)
     function renderProducts(){
       const start = (state.page-1)*state.perPage;
       const end = start + state.perPage;
@@ -243,51 +331,152 @@
       });
     }
 
-function attachAddCartEvents(){
-  Array.from(document.querySelectorAll('.add-cart')).forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      const id = Number(btn.dataset.id);
-      const product = products.find(p=>p.id===id);
-      addToCart(product);
-      btn.textContent = "✓";
-      setTimeout(()=>btn.textContent = "Tambah",700);
+    function attachAddCartEvents(){
+      Array.from(document.querySelectorAll('.add-cart')).forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          const id = Number(btn.dataset.id);
+          const product = products.find(p=>p.id===id);
+          addToCart(product);
+          btn.textContent = "✓";
+          setTimeout(()=>btn.textContent = "Tambah",700);
+        });
+      });
+    }
+
+    // -------------------------
+    // CART: localStorage + UI drawer
+    // -------------------------
+    function getCart(){
+      return JSON.parse(localStorage.getItem("cart") || "[]");
+    }
+    function saveCart(cart){
+      localStorage.setItem("cart", JSON.stringify(cart));
+    }
+
+    function addToCart(product){
+      let cart = getCart();
+      const index = cart.findIndex(item => item.id === product.id);
+      if(index >= 0){
+        cart[index].qty++;
+      } else {
+        cart.push({...product, qty: 1});
+      }
+      saveCart(cart);
+      updateCartBadge(cart);
+    }
+
+    function updateCartBadge(cart){
+      cartBtn.textContent = `Keranjang (${cart.reduce((s,i)=>s+i.qty,0)})`;
+      document.getElementById('cartCountText').textContent = `${cart.length} item — ${cart.reduce((s,i)=>s+i.qty,0)} pcs`;
+    }
+
+    // Render cart drawer items
+    function renderCartDrawer(){
+      const cart = getCart();
+      const container = document.getElementById('cartItems');
+      if(cart.length === 0){
+        container.innerHTML = `<div class="small">Keranjang kosong — tambahkan produk dulu.</div>`;
+      } else {
+        container.innerHTML = cart.map(item => `
+          <div class="cart-item" data-id="${item.id}">
+            <img src="${item.img}" alt="${escapeHtml(item.title)}" />
+            <div style="flex:1">
+              <div style="font-weight:700">${escapeHtml(item.title)}</div>
+              <div class="small">Rp ${numberWithCommas(item.price)} / pcs</div>
+              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+                <div class="qty-controls">
+                  <button class="btn qty-decr" data-id="${item.id}">-</button>
+                  <div style="padding:6px 10px;border-radius:8px;background:#f6f7fb">${item.qty}</div>
+                  <button class="btn qty-incr" data-id="${item.id}">+</button>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-weight:700">Rp ${numberWithCommas(item.price * item.qty)}</div>
+                  <div style="margin-top:6px"><button class="btn" data-id="${item.id}" data-action="remove">Hapus</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // totals
+      const subtotal = cart.reduce((s,i)=>s + (i.price * i.qty), 0);
+      const shipping = 0;
+      const total = subtotal + shipping;
+      document.getElementById('subtotalText').textContent = `Rp ${numberWithCommas(subtotal)}`;
+      document.getElementById('shippingText').textContent = `Rp ${numberWithCommas(shipping)}`;
+      document.getElementById('totalText').textContent = `Rp ${numberWithCommas(total)}`;
+
+      // attach qty/remove events
+      Array.from(document.querySelectorAll('.qty-incr')).forEach(b=>{
+        b.addEventListener('click', () => {
+          const id = Number(b.dataset.id);
+          changeQty(id, +1);
+        });
+      });
+      Array.from(document.querySelectorAll('.qty-decr')).forEach(b=>{
+        b.addEventListener('click', () => {
+          const id = Number(b.dataset.id);
+          changeQty(id, -1);
+        });
+      });
+      Array.from(document.querySelectorAll('button[data-action="remove"]')).forEach(b=>{
+        b.addEventListener('click', () => {
+          const id = Number(b.dataset.id);
+          removeFromCart(id);
+        });
+      });
+    }
+
+    function changeQty(id, delta){
+      const cart = getCart();
+      const idx = cart.findIndex(i=>i.id===id);
+      if(idx<0) return;
+      cart[idx].qty = Math.max(1, cart[idx].qty + delta);
+      saveCart(cart);
+      renderCartDrawer();
+      updateCartBadge(cart);
+    }
+
+    function removeFromCart(id){
+      let cart = getCart();
+      cart = cart.filter(i=>i.id !== id);
+      saveCart(cart);
+      renderCartDrawer();
+      updateCartBadge(cart);
+    }
+
+    // Cart drawer open/close
+    const cartDrawer = document.getElementById('cartDrawer');
+    document.getElementById('cart-btn').addEventListener('click', ()=>{
+      renderCartDrawer();
+      cartDrawer.classList.add('open');
+      cartDrawer.setAttribute('aria-hidden','false');
+      document.body.style.overflow = 'hidden';
     });
-  });
-}
+    document.getElementById('closeCart').addEventListener('click', ()=>{
+      cartDrawer.classList.remove('open');
+      cartDrawer.setAttribute('aria-hidden','true');
+      document.body.style.overflow = '';
+    });
 
-function addToCart(product){
-  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
-  const index = cart.findIndex(item => item.id === product.id);
-  if(index >= 0){
-    cart[index].qty++;
-  } else {
-    cart.push({...product, qty: 1});
-  }
-  localStorage.setItem("cart", JSON.stringify(cart));
-  updateCartBadge(cart);
-}
+    // Initial badge update
+    updateCartBadge(getCart());
 
-function updateCartBadge(cart){
-  cartBtn.textContent = `Keranjang (${cart.reduce((s,i)=>s+i.qty,0)})`;
-}
-
-// Saat halaman dimuat
-updateCartBadge(JSON.parse(localStorage.getItem("cart")||"[]"));
-
-
-    // Sorting
+    // -------------------------
+    // Sorting / filters (kept)
+    // -------------------------
     document.getElementById('sort').addEventListener('change', e=>{
       const v = e.target.value;
       if(v==='price-asc'){ state.filtered.sort((a,b)=>a.price-b.price); }
       else if(v==='price-desc'){ state.filtered.sort((a,b)=>b.price-a.price); }
       else if(v==='latest'){ state.filtered = state.filtered.slice().reverse(); }
-      else if(v==='popular'){ /* placeholder: stable */ }
+      else if(v==='popular'){ /* placeholder */ }
       else { state.filtered = applyAllFilters(); }
       state.page = 1;
       renderProducts();
     });
 
-    // Tags
     document.getElementById('tagContainer').addEventListener('click', e=>{
       const tagEl = e.target.closest('.tag');
       if(!tagEl) return;
@@ -297,7 +486,6 @@ updateCartBadge(JSON.parse(localStorage.getItem("cart")||"[]"));
       applyFiltersAndRender();
     });
 
-    // Price filter
     document.getElementById('apply-price').addEventListener('click',()=>{
       const min = Number(document.getElementById('minPrice').value) || null;
       const max = Number(document.getElementById('maxPrice').value) || null;
@@ -315,31 +503,194 @@ updateCartBadge(JSON.parse(localStorage.getItem("cart")||"[]"));
 
     function applyAllFilters(){
       return products.filter(p=>{
-        // tags
         if(state.activeTags.size>0){
           const intersect = p.tag.some(t=>state.activeTags.has(t));
           if(!intersect) return false;
         }
-        // price
         if(state.minPrice!=null && p.price < state.minPrice) return false;
         if(state.maxPrice!=null && p.price > state.maxPrice) return false;
         return true;
       });
     }
-
     function applyFiltersAndRender(){
       state.filtered = applyAllFilters();
       state.page = 1;
-      // reset sort select
       document.getElementById('sort').value = 'default';
       renderProducts();
     }
 
+    // -------------------------
+    // CHECKOUT: save order to Firebase + generate invoice + open WhatsApp
+    // -------------------------
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const saveDraftBtn = document.getElementById('saveDraft');
+
+    // default phone from user (converted to +62)
+    const sellerPhoneRaw = "0816772145";
+    const sellerPhoneForWA = sellerPhoneRaw.replace(/^0/, "62"); // e.g. 0812 -> 62812
+    const sellerPhoneForWaLink = sellerPhoneForWA; // used in wa.me link (no plus)
+
     // Utilities
     function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
-    function escapeHtml(text){ return text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function escapeHtml(text){ return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
-    // Initial render
+    // Create invoice and push order to Firebase
+    async function submitOrder(saveOnly=false){
+      const cart = getCart();
+      if(cart.length === 0) { alert("Keranjang kosong."); return; }
+
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const address = document.getElementById('custAddress').value.trim();
+      const note = document.getElementById('custNote').value.trim();
+
+      if(!name || !phone || !address){
+        alert("Mohon isi Nama, Nomor telepon, dan Alamat pengiriman.");
+        return;
+      }
+
+      // build order object
+      const now = new Date();
+      const invoiceNo = `INV-${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}-${now.getTime().toString().slice(-6)}`;
+      const subtotal = cart.reduce((s,i)=>s + (i.price * i.qty), 0);
+      const shipping = 0;
+      const total = subtotal + shipping;
+
+      const order = {
+        invoiceNo,
+        createdAt: now.toISOString(),
+        customer: { name, phone, address, note },
+        items: cart.map(ci=>({ id:ci.id, title:ci.title, price:ci.price, qty:ci.qty, lineTotal:ci.price*ci.qty })),
+        subtotal,
+        shipping,
+        total,
+        status: "pending"
+      };
+
+      try {
+        // push to realtime db under /orders
+        const ordersRef = ref(db, 'orders');
+        const newOrderRef = await push(ordersRef);
+        await set(newOrderRef, order);
+
+        // if saveOnly then keep cart and just notify saved
+        if(saveOnly){
+          alert("Draft pesanan disimpan (Firebase). Invoice: " + invoiceNo);
+          return;
+        }
+
+        // clear cart after successful save
+        localStorage.removeItem('cart');
+        updateCartBadge([]);
+        renderCartDrawer();
+
+        // build invoice text for WhatsApp (short)
+        let waText = `Halo, saya ingin memesan dari Cookie Bakery.%0A`;
+        waText += `Nomor Invoice: *${invoiceNo}*%0A`;
+        waText += `Nama: ${encodeURIComponent(name)}%0A`;
+        waText += `Telp: ${encodeURIComponent(phone)}%0A`;
+        waText += `Alamat: ${encodeURIComponent(address)}%0A`;
+        waText += `Catatan: ${encodeURIComponent(note || "-")}%0A%0A`;
+        waText += `Pesanan:%0A`;
+        order.items.forEach(it=>{
+          waText += `${encodeURIComponent(it.qty)} x ${encodeURIComponent(it.title)} - Rp ${numberWithCommas(it.price*it.qty)}%0A`;
+        });
+        waText += `%0ASubtotal: Rp ${numberWithCommas(subtotal)}%0ATotal: Rp ${numberWithCommas(total)}%0A%0A`;
+        waText += `Terima kasih.`;
+
+        // also open printable invoice in new window
+        const invoiceHtml = generateInvoiceHtml(order);
+        const invWindow = window.open('', '_blank');
+        invWindow.document.write(invoiceHtml);
+        invWindow.document.close();
+
+        // open wa link
+        const waUrl = `https://wa.me/${sellerPhoneForWaLink}?text=${waText}`;
+        // small delay to ensure invoice window opens first
+        window.open(waUrl, '_blank');
+
+        // close drawer
+        cartDrawer.classList.remove('open');
+        cartDrawer.setAttribute('aria-hidden','true');
+        document.body.style.overflow = '';
+
+      } catch (err) {
+        console.error(err);
+        alert("Gagal menyimpan pesanan ke Firebase. Cek console.");
+      }
+    }
+
+    // save draft
+    saveDraftBtn.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      await submitOrder(true);
+    });
+
+    checkoutBtn.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      await submitOrder(false);
+    });
+
+    // generate printable invoice HTML
+    function generateInvoiceHtml(order){
+      const itemsHtml = order.items.map(it=>`
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(it.title)}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${it.qty}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">Rp ${numberWithCommas(it.price)}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">Rp ${numberWithCommas(it.lineTotal)}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>Invoice ${order.invoiceNo}</title>
+        </head>
+        <body style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:24px">
+          <h2>Invoice — Cookie Bakery</h2>
+          <div>Invoice: <strong>${order.invoiceNo}</strong></div>
+          <div>Tanggal: ${new Date(order.createdAt).toLocaleString()}</div>
+          <hr style="margin:12px 0"/>
+          <h4>Customer</h4>
+          <div>${escapeHtml(order.customer.name)}</div>
+          <div>${escapeHtml(order.customer.phone)}</div>
+          <div>${escapeHtml(order.customer.address)}</div>
+          <div style="margin-top:8px">Catatan: ${escapeHtml(order.customer.note || "-")}</div>
+
+          <h4 style="margin-top:12px">Items</h4>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr><th style="text-align:left;padding:8px">Produk</th><th style="text-align:center;padding:8px">Qty</th><th style="text-align:right;padding:8px">Harga</th><th style="text-align:right;padding:8px">Jumlah</th></tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div style="margin-top:12px;display:flex;justify-content:flex-end">
+            <div style="width:320px">
+              <div style="display:flex;justify-content:space-between"><div>Subtotal</div><div>Rp ${numberWithCommas(order.subtotal)}</div></div>
+              <div style="display:flex;justify-content:space-between"><div>Ongkir</div><div>Rp ${numberWithCommas(order.shipping)}</div></div>
+              <hr/>
+              <div style="display:flex;justify-content:space-between;font-weight:700"><div>Total</div><div>Rp ${numberWithCommas(order.total)}</div></div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px">Terima kasih telah memesan. Silakan lanjut konfirmasi di WhatsApp.</div>
+
+          <div style="margin-top:18px">
+            <button onclick="window.print()" style="padding:8px 12px;border-radius:8px;border:0;background:#222;color:#fff">Cetak PDF</button>
+          </div>
+        </body>
+        </html>
+      `;
+    }
+
+    // -------------------------
+    // Init & utilities final
+    // -------------------------
     document.getElementById('year').textContent = new Date().getFullYear();
     renderProducts();
 
