@@ -191,8 +191,30 @@ document.getElementById("checkoutBtn").onclick=async()=>{
   const now=new Date();const inv=`INV-${now.getTime()}`;
   const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
 
-  const order={inv,name,phone,addr,note,cart,total,time:now.toISOString()};
-  await set(push(ref(db,"orders")),order);
+// Format sesuai admin dashboard
+const order = {
+  invoiceNo: inv,
+  createdAt: now.toISOString(),
+  customer: {
+    name: name,
+    phone: phone,
+    address: addr,
+    note: note || "-"
+  },
+  items: cart.map(i => ({
+    id: i.id,
+    title: i.title,
+    price: i.price,
+    qty: i.qty,
+    lineTotal: i.qty * i.price
+  })),
+  subtotal: total,
+  shipping: 0,
+  total: total,
+  status: "pending"
+};
+
+await set(push(ref(db,"orders")), order);
 
   const message=`Halo, saya ingin pesan.%0AInvoice: ${inv}%0A${cart.map(i=>`${i.qty} x ${i.title}`).join(", ")}%0ATotal: Rp ${total.toLocaleString()}%0AAlamat: ${encodeURIComponent(addr)}`;
   window.open(`https://wa.me/62816772145?text=${message}`,"_blank");
