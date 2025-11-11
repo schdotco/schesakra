@@ -1,255 +1,190 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cookie Shop — Produk</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cookie Bakery — Cookies Premium</title>
 
-  <!-- CSS SAMA PERSIS (TIDAK DIUBAH) -->
-  <style>
-    :root{
-      --accent:#c4553b;
-      --muted:#6b7280;
-      --bg:#f6f8fa;
-      --card:#ffffff;
-      --radius:12px;
-      --max-width:1180px;
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:#111;line-height:1.4}
-    .container{max-width:var(--max-width);margin:28px auto;padding:0 18px}
-    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-    .brand{display:flex;gap:12px;align-items:center}
-    .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#f8a07a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
-    nav ul{display:flex;gap:14px;list-style:none;padding:0;margin:0}
-    nav a{color:var(--muted);text-decoration:none;font-weight:600}
-    .actions{display:flex;gap:10px;align-items:center}
-    .btn{background:var(--card);border:1px solid #e6e9ef;padding:8px 12px;border-radius:10px;cursor:pointer}
-    .btn.primary{background:var(--accent);color:#fff;border:0}
-    .breadcrumb{font-size:13px;color:var(--muted);margin:10px 0 18px}
+<style>
+  :root{
+    --accent:#C4553B;
+    --text:#111;
+    --muted:#767676;
+    --bg:#faf9f7;
+    --card:#ffffff;
+    --radius:16px;
+    font-family: "Inter", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);}
+  header{
+    width:100%;padding:18px 0;background:#fff;
+    border-bottom:1px solid #eee;
+    position:sticky;top:0;z-index:200;
+  }
+  .container{max-width:1160px;margin:auto;padding:0 18px;}
+  .nav{display:flex;align-items:center;justify-content:space-between;}
+  .brand{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700;}
+  .brand span{color:var(--accent);}
+  .nav a{text-decoration:none;color:var(--muted);font-weight:500;margin-left:18px;}
+  .btn-cart{
+    background:var(--accent);color:#fff;border:0;border-radius:8px;
+    padding:10px 18px;font-weight:600;cursor:pointer;
+  }
 
-    .layout{display:grid;grid-template-columns:300px 1fr;gap:20px}
-    @media (max-width:900px){ .layout{grid-template-columns:1fr} .sidebar{order:2} .main{order:1} }
+  /* PRODUCT GRID */
+  .section-title{margin:34px 0 14px;font-size:26px;font-weight:700;text-align:center;}
+  .products{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+    gap:22px;margin-bottom:60px;
+  }
+  .product{
+    background:var(--card);border-radius:var(--radius);
+    overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.06);
+    display:flex;flex-direction:column;transition:.25s;
+  }
+  .product:hover{transform:translateY(-4px);}
+  .product img{width:100%;height:240px;object-fit:cover;}
+  .details{padding:14px;flex:1;display:flex;flex-direction:column;}
+  .title{font-size:16px;font-weight:600;margin-bottom:6px;}
+  .price{font-size:16px;font-weight:700;color:var(--accent);margin-top:auto;}
+  .add-btn{
+    margin-top:10px;background:#111;color:#fff;border:0;
+    padding:8px;border-radius:8px;font-weight:600;cursor:pointer;
+  }
 
-    .card{background:var(--card);border-radius:var(--radius);box-shadow:0 6px 18px rgba(12,20,40,0.06);padding:16px}
-
-    .controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px}
-    .sort-select{padding:8px;border-radius:8px;border:1px solid #e6e9ef}
-
-    .products{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-    @media (max-width:1100px){.products{grid-template-columns:repeat(2,1fr)}}
-    @media (max-width:640px){.products{grid-template-columns:repeat(1,1fr)}}
-
-    .product{border-radius:12px;overflow:hidden;background:var(--card);display:flex;flex-direction:column}
-    .product img{width:100%;height:200px;object-fit:cover;display:block}
-    .product .body{padding:12px;flex:1;display:flex;flex-direction:column}
-    .price-row{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
-    .price{font-weight:700;color:var(--accent)}
-    .add-cart{padding:8px 10px;border-radius:8px;border:0;background:#111;color:#fff;cursor:pointer}
-
-    footer{margin-top:28px;padding:18px 0;text-align:center;color:var(--muted);font-size:14px}
-
-    /* CART */
-    .cart-drawer {
-      position:fixed;right:0;top:0;height:100vh;width:420px;max-width:100%;
-      transform:translateX(110%);transition:transform .28s ease;z-index:1200;
-      padding:22px;background:var(--card);overflow:auto;
-    }
-    .cart-drawer.open { transform:translateX(0); }
-    .cart-item{display:flex;gap:12px;align-items:center;border:1px solid #eee;padding:8px;border-radius:10px}
-    .qty-controls{display:flex;gap:6px;align-items:center}
-  </style>
+  /* CART */
+  .cart-drawer{
+    position:fixed;top:0;right:0;width:420px;max-width:100%;
+    height:100vh;background:#fff;z-index:3000;padding:20px;
+    transform:translateX(110%);transition:.3s;
+    overflow:auto;
+  }
+  .cart-drawer.open{transform:translateX(0);}
+  .cart-item{display:flex;gap:10px;margin-bottom:12px;}
+  .cart-item img{width:60px;border-radius:8px;}
+  .checkout-input{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ddd;}
+  .checkout-btn{margin-top:18px;width:100%;padding:12px;border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:10px;}
+</style>
 </head>
 
 <body>
-  <div class="container">
-    <header>
-      <div class="brand">
-        <div class="logo">CB</div>
-        <div>
-          <div style="font-weight:800;font-size:18px">Cookie Bakery</div>
-          <div class="muted">Snacks untuk acara spesial</div>
-        </div>
-      </div>
 
-      <nav>
-        <ul><li><a href="#">Home</a></li><li><a href="#">Produk</a></li></ul>
-      </nav>
-
-      <div class="actions">
-        <button class="btn primary" id="cart-btn">Keranjang (0)</button>
-      </div>
-    </header>
-
-    <div class="layout">
-
-      <!-- MAIN -->
-      <main class="main">
-        <div class="card">
-          <div class="controls">
-            <span class="muted" id="resultCount">Menampilkan 12 produk</span>
-            <select id="sort" class="sort-select">
-              <option value="default">Urutan Normal</option>
-              <option value="price-asc">Harga: Rendah ke Tinggi</option>
-              <option value="price-desc">Harga: Tinggi ke Rendah</option>
-            </select>
-          </div>
-
-          <div class="products" id="productsGrid"></div>
-        </div>
-      </main>
-    </div>
-
-    <footer>© <span id="year"></span> Cookie Bakery</footer>
+<header>
+  <div class="container nav">
+    <div class="brand"><span>Cookie</span>Bakery</div>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#" style="color:var(--accent)">Cookies</a>
+    </nav>
+    <button id="cartBtn" class="btn-cart">Keranjang (0)</button>
   </div>
+</header>
 
-  <!-- CART DRAWER -->
-  <aside id="cartDrawer" class="cart-drawer">
-    <h3>Keranjang Anda</h3>
-    <div class="cart-items" id="cartItems"></div>
+<div class="container">
+  <h2 class="section-title">Cookies Premium</h2>
+  <div class="products" id="productsGrid"></div>
+</div>
 
-    <h4 style="margin-top:16px">Formulir Checkout</h4>
-    <input id="custName" placeholder="Nama lengkap">
-    <input id="custPhone" placeholder="Nomor telepon">
-    <input id="custAddress" placeholder="Alamat pengiriman">
-    <textarea id="custNote" placeholder="Catatan (opsional)"></textarea>
-    <button class="btn primary" id="checkoutBtn">Checkout & Kirim WA</button>
-    <button class="btn" id="closeCart">Tutup</button>
-  </aside>
+<!-- CART DRAWER -->
+<div id="cartDrawer" class="cart-drawer">
+  <h3>Keranjang</h3>
+  <div id="cartItems"></div>
 
-  <!-- FIREBASE + PDF GENERATOR -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <h4 style="margin-top:14px">Checkout</h4>
+  <input id="custName" class="checkout-input" placeholder="Nama lengkap">
+  <input id="custPhone" class="checkout-input" placeholder="Nomor telepon">
+  <input id="custAddr" class="checkout-input" placeholder="Alamat lengkap">
+  <textarea id="custNote" class="checkout-input" placeholder="Catatan (Opsional)"></textarea>
+  <button id="checkoutBtn" class="checkout-btn">Checkout & Kirim WhatsApp</button>
+  <button id="closeCart" class="checkout-btn" style="background:#777;margin-top:10px;">Tutup</button>
+</div>
 
-  <script type="module">
+<!-- Firebase & PDF -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-    // FIREBASE IMPORT
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+<script type="module">
+/* Firebase */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getDatabase, push, ref, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
-    // CONFIG
-    const firebaseConfig = {
-      apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
-      authDomain: "schesakra.firebaseapp.com",
-      databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "schesakra",
-      storageBucket: "schesakra.appspot.com",
-      messagingSenderId: "672537227977",
-      appId: "1:672537227977:web:88b24f905c86eba7c05318"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "schesakra",
+  storageBucket: "schesakra.appspot.com",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const storage = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
 
-    // PRODUK
-    const products = [
-      {id:1,title:"Choco Pastry Stick Box",price:35000,img:"https://via.placeholder.com/600x400?text=Choco+Stick"},
-      {id:2,title:"Cheese Pastry Stick Box",price:35000,img:"https://via.placeholder.com/600x400?text=Cheese+Stick"}
-    ];
+/* Products */
+const products = [
+  {id:1,title:"Choco Pastry Stick Box",price:35000,img:"https://via.placeholder.com/600x800?text=Choco+Pastry"},
+  {id:2,title:"Cheese Pastry Stick Box",price:35000,img:"https://via.placeholder.com/600x800?text=Cheese+Pastry"},
+];
 
-    // RENDER PRODUK
-    const productsGrid = document.getElementById("productsGrid");
-    function renderProducts(){
-      productsGrid.innerHTML = products.map(p=>`
-        <div class="product card">
-          <img src="${p.img}">
-          <div class="body">
-            <h4>${p.title}</h4>
-            <div class="price">Rp ${p.price.toLocaleString()}</div>
-            <button class="add-cart" data-id="${p.id}">Tambah</button>
-          </div>
-        </div>
-      `).join("");
+const productsGrid=document.getElementById("productsGrid");
 
-      document.querySelectorAll(".add-cart").forEach(btn=>{
-        btn.onclick = ()=>addToCart(products.find(x=>x.id==btn.dataset.id));
-      });
-    }
-    renderProducts();
+function renderProducts(){
+  productsGrid.innerHTML = products.map(p=>`
+    <div class="product">
+      <img src="${p.img}">
+      <div class="details">
+        <div class="title">${p.title}</div>
+        <div class="price">Rp ${p.price.toLocaleString()}</div>
+        <button class="add-btn" data-id="${p.id}">Tambah</button>
+      </div>
+    </div>
+  `).join("");
 
-    // KERANJANG
-    function getCart(){ return JSON.parse(localStorage.getItem("cart")||"[]"); }
-    function saveCart(c){ localStorage.setItem("cart",JSON.stringify(c)); }
+  document.querySelectorAll(".add-btn").forEach(btn=>{
+    btn.onclick=()=>addToCart(products.find(x=>x.id==btn.dataset.id));
+  });
+}
+renderProducts();
 
-    function addToCart(p){
-      const c = getCart();
-      const i = c.find(x=>x.id===p.id);
-      if(i) i.qty++; else c.push({...p,qty:1});
-      saveCart(c); updateCartUI();
-    }
+/* Cart Logic */
+function getCart(){return JSON.parse(localStorage.getItem("cart")||"[]");}
+function saveCart(c){localStorage.setItem("cart",JSON.stringify(c));}
 
-    function updateCartUI(){
-      const c = getCart();
-      document.getElementById("cart-btn").textContent = `Keranjang (${c.reduce((s,i)=>s+i.qty,0)})`;
-      const box = document.getElementById("cartItems");
-      box.innerHTML = c.length ? c.map(i=>`
-        <div class="cart-item">
-          <img src="${i.img}" width="60">
-          <div style="flex:1;">
-            <strong>${i.title}</strong><br>
-            Rp ${(i.price*i.qty).toLocaleString()}
-          </div>
-        </div>
-      `).join("") : "Keranjang kosong";
-    }
-    updateCartUI();
+function addToCart(p){
+  const c=getCart();const f=c.find(x=>x.id===p.id);
+  f?f.qty++:c.push({...p,qty:1});saveCart(c);updateCartUI();
+}
 
-    document.getElementById("cart-btn").onclick = ()=>document.getElementById("cartDrawer").classList.add("open");
-    document.getElementById("closeCart").onclick = ()=>document.getElementById("cartDrawer").classList.remove("open");
+function updateCartUI(){
+  const c=getCart();document.getElementById("cartBtn").textContent=`Keranjang (${c.reduce((a,b)=>a+b.qty,0)})`;
+  document.getElementById("cartItems").innerHTML=
+    c.map(i=>`<div class="cart-item"><img src="${i.img}"><div>${i.title}<br>Rp ${(i.qty*i.price).toLocaleString()}</div></div>`).join("")||"Keranjang kosong";
+}
+updateCartUI();
 
-    // BUAT PDF
-    async function generatePdf(html){
-      const { jsPDF } = window.jspdf;
-      const wrap = document.createElement("div");
-      wrap.style.position="fixed";wrap.style.left="-9999px";
-      wrap.innerHTML = html;
-      document.body.appendChild(wrap);
-      const canvas = await html2canvas(wrap,{scale:2});
-      document.body.removeChild(wrap);
-      const img = canvas.toDataURL("image/png");
-      const pdf = new jsPDF();
-      pdf.addImage(img,"PNG",0,0,210,0);
-      return pdf.output("blob");
-    }
+document.getElementById("cartBtn").onclick=()=>document.getElementById("cartDrawer").classList.add("open");
+document.getElementById("closeCart").onclick=()=>document.getElementById("cartDrawer").classList.remove("open");
 
-    // CHECKOUT
-    document.getElementById("checkoutBtn").onclick = async ()=>{
-      const cart = getCart();
-      const name=document.getElementById("custName").value;
-      const phone=document.getElementById("custPhone").value;
-      const addr=document.getElementById("custAddress").value;
-      const note=document.getElementById("custNote").value;
+/* Checkout WhatsApp + PDF */
+document.getElementById("checkoutBtn").onclick=async()=>{
+  const cart=getCart();const name=custName.value;const phone=custPhone.value;const addr=custAddr.value;const note=custNote.value;
+  const now=new Date();const inv=`INV-${now.getTime()}`;
+  const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
 
-      const now=new Date();
-      const invoice=`INV-${now.getFullYear()}${(now.getMonth()+1)}${now.getDate()}-${now.getTime()}`;
-      const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
+  const order={inv,name,phone,addr,note,cart,total,time:now.toISOString()};
+  await set(push(ref(db,"orders")),order);
 
-      const order={invoice,customer:{name,phone,addr,note},items:cart,total,at:now.toISOString()};
-      await set(push(ref(db,"orders")),order);
+  const message=`Halo, saya ingin pesan.%0AInvoice: ${inv}%0A${cart.map(i=>`${i.qty} x ${i.title}`).join(", ")}%0ATotal: Rp ${total.toLocaleString()}%0AAlamat: ${encodeURIComponent(addr)}`;
+  window.open(`https://wa.me/62816772145?text=${message}`,"_blank");
 
-      const pdfBlob = await generatePdf(`
-        <h1>Invoice ${invoice}</h1>
-        Nama: ${name}<br>Telepon: ${phone}<br>Alamat: ${addr}<hr>
-        ${cart.map(i=>`${i.qty} x ${i.title} = Rp ${(i.qty*i.price).toLocaleString()}`).join("<br>")}
-        <hr>Total: Rp ${total.toLocaleString()}
-      `);
+  localStorage.removeItem("cart");updateCartUI();
+  document.getElementById("cartDrawer").classList.remove("open");
+};
+</script>
 
-      const fileRef=sRef(storage,`invoices/${invoice}.pdf`);
-      await uploadBytes(fileRef,pdfBlob);
-      const url = await getDownloadURL(fileRef);
-
-      const wa=`https://wa.me/62816772145?text=Halo,%20saya%20checkout.%0AInvoice:%20${invoice}%0A${encodeURIComponent(url)}`;
-      window.open(wa,"_blank");
-
-      localStorage.removeItem("cart");
-      updateCartUI();
-      document.getElementById("cartDrawer").classList.remove("open");
-    };
-
-    document.getElementById("year").textContent=new Date().getFullYear();
-  </script>
 </body>
 </html>
