@@ -245,15 +245,15 @@
     import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
-      authDomain: "schesakra.firebaseapp.com",
-      databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "schesakra",
-      storageBucket: "schesakra.firebasestorage.app",
-      messagingSenderId: "672537227977",
-      appId: "1:672537227977:web:88b24f905c86eba7c05318",
-      measurementId: "G-Q7HSM1LK98"
-    };
+    apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+    authDomain: "schesakra.firebaseapp.com",
+    databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "schesakra",
+    storageBucket: "schesakra.appspot.com", // ✅ Perbaiki baris ini
+    messagingSenderId: "672537227977",
+    appId: "1:672537227977:web:88b24f905c86eba7c05318",
+    measurementId: "G-Q7HSM1LK98"
+  };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
