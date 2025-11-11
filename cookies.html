@@ -243,17 +243,37 @@
       });
     }
 
-    function attachAddCartEvents(){
-      Array.from(document.querySelectorAll('.add-cart')).forEach(btn=>{
-        btn.addEventListener('click', e=>{
-          state.cartCount++;
-          cartBtn.textContent = `Keranjang (${state.cartCount})`;
-          // simple add-to-cart feedback
-          btn.textContent = "✓";
-          setTimeout(()=>btn.textContent = "Tambah",700);
-        });
-      });
-    }
+function attachAddCartEvents(){
+  Array.from(document.querySelectorAll('.add-cart')).forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = Number(btn.dataset.id);
+      const product = products.find(p=>p.id===id);
+      addToCart(product);
+      btn.textContent = "✓";
+      setTimeout(()=>btn.textContent = "Tambah",700);
+    });
+  });
+}
+
+function addToCart(product){
+  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  const index = cart.findIndex(item => item.id === product.id);
+  if(index >= 0){
+    cart[index].qty++;
+  } else {
+    cart.push({...product, qty: 1});
+  }
+  localStorage.setItem("cart", JSON.stringify(cart));
+  updateCartBadge(cart);
+}
+
+function updateCartBadge(cart){
+  cartBtn.textContent = `Keranjang (${cart.reduce((s,i)=>s+i.qty,0)})`;
+}
+
+// Saat halaman dimuat
+updateCartBadge(JSON.parse(localStorage.getItem("cart")||"[]"));
+
 
     // Sorting
     document.getElementById('sort').addEventListener('change', e=>{
