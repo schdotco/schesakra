@@ -1,99 +1,551 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Keranjang Belanja</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Keranjang & Checkout — Cookie Bakery</title>
+  <meta name="description" content="Halaman keranjang, checkout, invoice, dan kirim pesanan ke WhatsApp. Terhubung ke Firebase Realtime Database." />
+  <style>
+    :root{
+      --accent:#c4553b;
+      --muted:#6b7280;
+      --bg:#f6f8fa;
+      --card:#ffffff;
+      --radius:12px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:#111}
+    .container{max-width:980px;margin:28px auto;padding:16px}
+    h1{margin:0 0 8px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(12,20,40,0.06)}
+    .layout{display:grid;grid-template-columns:1fr 360px;gap:16px;margin-top:18px}
+    @media (max-width:980px){ .layout{grid-template-columns:1fr} }
 
-<style>
-  body{font-family:Arial, sans-serif;background:#f6f8fa;margin:0;padding:0}
-  .container{max-width:900px;margin:30px auto;padding:0 18px}
-  h1{margin-bottom:18px}
-  table{width:100%;border-collapse:collapse;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-radius:10px;overflow:hidden}
-  th,td{padding:12px;border-bottom:1px solid #f0f0f0;text-align:left}
-  th{background:#fafafa;font-weight:600}
-  img{width:80px;height:60px;object-fit:cover;border-radius:8px}
-  .qty-btn{padding:4px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:14px}
-  .total-box{margin-top:18px;padding:18px;background:#fff;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center}
-  .checkout-btn{padding:12px 18px;border-radius:8px;background:#c4553b;color:#fff;font-weight:bold;border:0;cursor:pointer}
-</style>
+    /* cart table */
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #f0f2f5;text-align:left;vertical-align:middle}
+    th{font-weight:700;color:var(--muted);font-size:13px}
+    .product-thumb{display:flex;gap:12px;align-items:center}
+    .product-thumb img{width:72px;height:56px;object-fit:cover;border-radius:8px}
+    .qty-input{width:66px;padding:6px;border-radius:8px;border:1px solid #e6e9ef;text-align:center}
+    .btn{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    .btn.ghost{background:transparent;color:var(--muted);border:1px solid #e6e9ef}
+    .muted{color:var(--muted);font-size:13px}
+    .right-col .section{margin-bottom:12px}
+    .totals{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    .total-row{display:flex;justify-content:space-between;align-items:center}
+    .invoice{margin-top:12px;padding:12px;border-radius:8px;background:#fbfbfb;border:1px dashed #eee;font-size:14px}
+    .notice{background:#fff7ed;border-left:4px solid #f5a623;padding:10px;border-radius:8px;margin-bottom:12px;color:#7a4a2b}
+
+    input[type="text"], input[type="tel"], textarea{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+    label{font-size:13px;display:block;margin-bottom:6px;color:var(--muted)}
+    .actions-row{display:flex;gap:8px;flex-wrap:wrap}
+    .small{font-size:13px;color:var(--muted)}
+  </style>
 </head>
 <body>
+  <div class="container">
+    <div class="top">
+      <div>
+        <h1>Keranjang Belanja</h1>
+        <div class="muted">Periksa pesanan Anda, lengkapi data, lalu checkout.</div>
+      </div>
+      <div>
+        <button class="btn" id="continueShopping">Lanjutkan Belanja</button>
+      </div>
+    </div>
 
-<div class="container">
-  <h1>Keranjang Belanja</h1>
+    <div class="layout">
+      <!-- LEFT: CART LIST -->
+      <div>
+        <div class="card" id="cartCard">
+          <h3 style="margin-top:0">Daftar Pesanan</h3>
+          <div id="emptyNotice" class="muted" style="display:none">Keranjang kosong. Kembali ke halaman produk untuk menambah pesanan.</div>
+          <div id="cartTableWrapper" style="overflow:auto">
+            <table id="cartTable" style="min-width:680px">
+              <thead>
+                <tr>
+                  <th style="width:45%">Produk</th>
+                  <th style="width:12%">Harga</th>
+                  <th style="width:12%">Jumlah</th>
+                  <th style="width:12%">Subtotal</th>
+                  <th style="width:9%"></th>
+                </tr>
+              </thead>
+              <tbody id="cartBody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <div class="small">Total item: <span id="totalItems">0</span></div>
+            <div>
+              <button class="btn ghost" id="clearCart">Bersihkan Keranjang</button>
+            </div>
+          </div>
+        </div>
 
-  <table id="cartTable">
-    <thead>
-      <tr>
-        <th>Produk</th>
-        <th>Harga</th>
-        <th>Qty</th>
-        <th>Subtotal</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+        <!-- Invoice view will appear after checkout -->
+        <div id="invoiceContainer" style="margin-top:12px;display:none"></div>
+      </div>
 
-  <div class="total-box">
-    <div style="font-size:18px">Total: <strong id="totalPrice">Rp 0</strong></div>
-    <button class="checkout-btn" id="checkoutBtn">Checkout</button>
+      <!-- RIGHT: Checkout form -->
+      <aside class="right-col">
+        <div class="card">
+          <h3 style="margin-top:0">Ringkasan & Checkout</h3>
+          <div class="section">
+            <div class="totals">
+              <div class="total-row"><div class="muted">Subtotal</div><div id="subTotalText">Rp 0</div></div>
+              <div class="total-row"><div class="muted">Biaya kirim</div><div id="shippingText">Rp 0</div></div>
+              <div style="height:1px;background:#f0f2f5;margin:4px 0;border-radius:2px"></div>
+              <div class="total-row" style="font-weight:800;font-size:18px"><div>Total</div><div id="grandTotalText">Rp 0</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <label for="custName">Nama Penerima</label>
+            <input id="custName" type="text" placeholder="Nama lengkap" />
+          </div>
+          <div class="section">
+            <label for="custPhone">Nomor HP</label>
+            <input id="custPhone" type="tel" placeholder="08xxxxxxxxxx" />
+            <div class="small" style="margin-top:6px">Pastikan nomor aktif untuk konfirmasi (WhatsApp akan dibuka setelah checkout).</div>
+          </div>
+          <div class="section">
+            <label for="custAddress">Alamat</label>
+            <textarea id="custAddress" rows="3" placeholder="Alamat pengiriman / catatan"></textarea>
+          </div>
+
+          <div class="section">
+            <label for="shippingMethod">Metode Pengiriman</label>
+            <select id="shippingMethod" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef">
+              <option value="0">Ambil di outlet (Rp 0)</option>
+              <option value="15000">JNE / kurir (Rp 15.000)</option>
+              <option value="25000">Same-day (Rp 25.000)</option>
+            </select>
+          </div>
+
+          <div style="margin-top:8px" class="actions-row">
+            <button class="btn" id="checkoutBtn">Checkout & Buat Invoice</button>
+            <button class="btn ghost" id="previewInvoiceBtn" style="display:none">Lihat Invoice</button>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="card">
+          <div class="notice">
+            <strong>Catatan:</strong> Sistem ini menyimpan order ke Firebase Realtime Database. Pastikan konfigurasi Firebase sudah benar.
+          </div>
+          <div class="small">Setelah checkout, order akan tersimpan dan Anda dapat mengirim rincian pesanan lewat WhatsApp (pre-filled). Untuk menerima order via WA ke nomor penjual, ganti kode WA di tombol kirim (lihat komentar di kode).</div>
+        </div>
+      </aside>
+    </div>
   </div>
-</div>
 
-<script>
-  let cart = JSON.parse(localStorage.getItem("cart") || "[]");
-  const tbody = document.querySelector("#cartTable tbody");
-  const totalEl = document.getElementById("totalPrice");
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+  <!-- jsPDF untuk export invoice -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-Gc1m6KqBk3oJt2xQmE4Q3r1QGzvT1tVod1f2GfX1vD1/8s88JdY6qk2FOM8L7w6vCmgc1sH9Z5g2m+2Tz7mGFw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  function renderCart(){
-    tbody.innerHTML = cart.map(item=>`
-      <tr>
-        <td><img src="${item.img}"> ${item.title}</td>
-        <td>Rp ${numberWithCommas(item.price)}</td>
-        <td>
-          <button class="qty-btn" onclick="changeQty(${item.id},-1)">-</button>
-          ${item.qty}
-          <button class="qty-btn" onclick="changeQty(${item.id},1)">+</button>
-        </td>
-        <td>Rp ${numberWithCommas(item.price * item.qty)}</td>
-        <td><button class="qty-btn" onclick="removeItem(${item.id})">X</button></td>
-      </tr>
-    `).join('');
+  <script>
+    /**************************************************************************
+     * CONFIG FIREBASE (menggunakan config yang Anda berikan)
+     **************************************************************************/
+    const firebaseConfig = {
+      apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+      authDomain: "schesakra.firebaseapp.com",
+      databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "schesakra",
+      storageBucket: "schesakra.firebasestorage.app",
+      messagingSenderId: "672537227977",
+      appId: "1:672537227977:web:88b24f905c86eba7c05318",
+      measurementId: "G-Q7HSM1LK98"
+    };
 
-    totalEl.textContent = "Rp " + numberWithCommas(cart.reduce((s,i)=>s+(i.price*i.qty),0));
-  }
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  function changeQty(id,delta){
-    const index = cart.findIndex(i=>i.id===id);
-    if(index>=0){
-      cart[index].qty += delta;
-      if(cart[index].qty<=0) cart.splice(index,1);
-      save();
+    /**************************************************************************
+     * Utility & state
+     **************************************************************************/
+    const CART_KEY = 'cookieBakeryCart'; // key localStorage untuk bridging
+    let cart = []; // array of {id,title,price,qty,img}
+    const cartBody = document.getElementById('cartBody');
+    const subTotalText = document.getElementById('subTotalText');
+    const grandTotalText = document.getElementById('grandTotalText');
+    const shippingText = document.getElementById('shippingText');
+    const totalItemsEl = document.getElementById('totalItems');
+    const emptyNotice = document.getElementById('emptyNotice');
+    const cartTableWrapper = document.getElementById('cartTableWrapper');
+    const invoiceContainer = document.getElementById('invoiceContainer');
+
+    // Load cart from localStorage
+    function loadCart(){
+      try {
+        const raw = localStorage.getItem(CART_KEY);
+        cart = raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        console.error('Failed to parse cart from localStorage', e);
+        cart = [];
+      }
+      renderCart();
     }
-  }
 
-  function removeItem(id){
-    cart = cart.filter(i=>i.id!==id);
-    save();
-  }
+    function saveCart(){
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      renderCart();
+    }
 
-  function save(){
-    localStorage.setItem("cart", JSON.stringify(cart));
-    renderCart();
-  }
+    function formatRp(n){
+      if(isNaN(n)) return 'Rp 0';
+      return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
 
-  document.getElementById("checkoutBtn").onclick = ()=>{
-    alert("Silakan lanjutkan ke proses pemesanan via WhatsApp.");
-    // Bisa diarahkan ke WA:
-    // window.location.href = `https://wa.me/628xxxx?text=Saya ingin pesan: ...`
-  };
+    function calcTotals(){
+      const subtotal = cart.reduce((s,i)=> s + (i.price * i.qty), 0);
+      const shipping = Number(document.getElementById('shippingMethod').value || 0);
+      const grand = subtotal + shipping;
+      return {subtotal, shipping, grand};
+    }
 
-  renderCart();
-</script>
+    function renderCart(){
+      cartBody.innerHTML = '';
+      if(!cart || cart.length === 0){
+        emptyNotice.style.display = 'block';
+        cartTableWrapper.style.display = 'none';
+        document.getElementById('checkoutBtn').disabled = true;
+        document.getElementById('previewInvoiceBtn').style.display = 'none';
+      } else {
+        emptyNotice.style.display = 'none';
+        cartTableWrapper.style.display = 'block';
+        document.getElementById('checkoutBtn').disabled = false;
+      }
+
+      cart.forEach(item=>{
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>
+            <div class="product-thumb">
+              <img src="${item.img || 'https://via.placeholder.com/120x90?text=Product'}" alt="${escapeHtml(item.title)}"/>
+              <div>
+                <div style="font-weight:700">${escapeHtml(item.title)}</div>
+                <div class="muted" style="font-size:13px">ID: ${item.id}</div>
+              </div>
+            </div>
+          </td>
+          <td>${formatRp(item.price)}</td>
+          <td>
+            <input type="number" min="1" value="${item.qty}" class="qty-input" data-id="${item.id}" />
+          </td>
+          <td>${formatRp(item.price * item.qty)}</td>
+          <td><button class="btn ghost" data-remove="${item.id}">Hapus</button></td>
+        `;
+        cartBody.appendChild(row);
+      });
+
+      // attach events
+      Array.from(document.querySelectorAll('.qty-input')).forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const id = inp.dataset.id;
+          let val = parseInt(inp.value) || 1;
+          if(val < 1) val = 1;
+          const idx = cart.findIndex(x=>String(x.id) === String(id));
+          if(idx>-1){ cart[idx].qty = val; saveCart(); }
+        });
+      });
+      Array.from(document.querySelectorAll('[data-remove]')).forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          const id = btn.dataset.remove;
+          cart = cart.filter(x => String(x.id) !== String(id));
+          saveCart();
+        });
+      });
+
+      // totals
+      const totals = calcTotals();
+      subTotalText.textContent = formatRp(totals.subtotal);
+      shippingText.textContent = formatRp(totals.shipping);
+      grandTotalText.textContent = formatRp(totals.grand);
+      totalItemsEl.textContent = cart.reduce((s,i)=>s+i.qty,0);
+    }
+
+    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // clear cart
+    document.getElementById('clearCart').addEventListener('click', ()=>{
+      if(!confirm('Hapus semua item dari keranjang?')) return;
+      cart = [];
+      saveCart();
+    });
+
+    // continue shopping (link to cookies.html)
+    document.getElementById('continueShopping').addEventListener('click', ()=>{
+      window.location.href = 'cookies.html';
+    });
+
+    // update shipping cost when changed
+    document.getElementById('shippingMethod').addEventListener('change', ()=>{
+      const totals = calcTotals();
+      shippingText.textContent = formatRp(totals.shipping);
+      grandTotalText.textContent = formatRp(totals.grand);
+    });
+
+    /**************************************************************************
+     * Checkout: push order to Firebase, show invoice, generate PDF, WA link.
+     **************************************************************************/
+    document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
+      if(!cart || cart.length===0){ alert('Keranjang kosong.'); return; }
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const address = document.getElementById('custAddress').value.trim();
+      const shipping = Number(document.getElementById('shippingMethod').value || 0);
+
+      if(!name || !phone){ alert('Mohon isi nama dan nomor HP.'); return; }
+
+      // prepare order object
+      const totals = calcTotals();
+      const order = {
+        customer: {name, phone, address},
+        items: cart,
+        subtotal: totals.subtotal,
+        shipping_cost: shipping,
+        total: totals.grand,
+        status: 'pending',
+        createdAt: (new Date()).toISOString()
+      };
+
+      try {
+        // push to firebase
+        const ordersRef = db.ref('orders');
+        const newOrderRef = ordersRef.push();
+        await newOrderRef.set(order);
+        const orderId = newOrderRef.key;
+
+        // show invoice UI
+        showInvoice(orderId, order);
+
+        // clear cart (optional) - keep cleared locally
+        cart = [];
+        saveCart();
+
+        // open WhatsApp with prefilled message (buyer can send to seller)
+        // NOTE: ganti SELLER_NUMBER dengan nomor penjual jika mau direct ke nomor tertentu (format internasional tanpa +, misal 628123...)
+        const SELLER_NUMBER = ''; // contoh: '6281234567890' -> jika kosong, akan membuka wa.me tanpa nomor (pilih kontak sendiri)
+        const waMsg = buildWhatsAppMessage(orderId, order);
+        const waUrl = SELLER_NUMBER ? `https://wa.me/${SELLER_NUMBER}?text=${encodeURIComponent(waMsg)}` : `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
+
+        // show preview button and also open WA in new tab
+        document.getElementById('previewInvoiceBtn').style.display = 'inline-block';
+        document.getElementById('previewInvoiceBtn').onclick = ()=> showInvoice(orderId, order, true);
+
+        // open WhatsApp in new tab
+        window.open(waUrl, '_blank');
+
+        alert('Order tersimpan. Invoice ditampilkan di bawah. WhatsApp akan terbuka untuk mengirim pesan pesanan.');
+      } catch(err){
+        console.error('Checkout error', err);
+        alert('Terjadi kesalahan saat menyimpan order. Periksa koneksi atau konfigurasi Firebase.');
+      }
+    });
+
+    function buildWhatsAppMessage(orderId, order){
+      let lines = [];
+      lines.push(`Invoice: ${orderId}`);
+      lines.push(`Nama: ${order.customer.name}`);
+      lines.push(`HP: ${order.customer.phone}`);
+      if(order.customer.address) lines.push(`Alamat: ${order.customer.address}`);
+      lines.push('');
+      lines.push('Pesanan:');
+      order.items.forEach(it=>{
+        lines.push(`- ${it.title} x${it.qty} = ${formatRp(it.price * it.qty)}`);
+      });
+      lines.push('');
+      lines.push(`Subtotal: ${formatRp(order.subtotal)}`);
+      lines.push(`Ongkos kirim: ${formatRp(order.shipping_cost)}`);
+      lines.push(`Total: ${formatRp(order.total)}`);
+      lines.push('');
+      lines.push('Silakan konfirmasi pembayaran dan pengiriman.');
+      return lines.join('\n');
+    }
+
+    /**************************************************************************
+     * Render invoice HTML + export PDF
+     **************************************************************************/
+    function showInvoice(orderId, order, focus=false){
+      invoiceContainer.style.display = 'block';
+      invoiceContainer.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'card';
+      const itemsHtml = order.items.map(it=>`
+        <tr>
+          <td style="padding:6px 8px">${escapeHtml(it.title)}</td>
+          <td style="padding:6px 8px;text-align:right">${it.qty}</td>
+          <td style="padding:6px 8px;text-align:right">${formatRp(it.price)}</td>
+          <td style="padding:6px 8px;text-align:right">${formatRp(it.price * it.qty)}</td>
+        </tr>
+      `).join('');
+
+      const createdAt = new Date(order.createdAt).toLocaleString('id-ID');
+
+      card.innerHTML = `
+        <h3 style="margin-top:0">Invoice: <span style="color:var(--accent)">${orderId}</span></h3>
+        <div class="muted small">Tanggal: ${createdAt}</div>
+        <div style="margin-top:8px">
+          <strong>Penerima:</strong> ${escapeHtml(order.customer.name)}<br/>
+          <div class="muted">HP: ${escapeHtml(order.customer.phone)}</div>
+          ${order.customer.address ? `<div class="muted">Alamat: ${escapeHtml(order.customer.address)}</div>` : ''}
+        </div>
+
+        <div style="margin-top:12px;overflow:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f7f7f7"><th style="text-align:left;padding:8px">Produk</th><th style="text-align:right;padding:8px">Qty</th><th style="text-align:right;padding:8px">Harga</th><th style="text-align:right;padding:8px">Subtotal</th></tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="total-row"><div class="muted">Subtotal</div><div>${formatRp(order.subtotal)}</div></div>
+          <div class="total-row"><div class="muted">Ongkos kirim</div><div>${formatRp(order.shipping_cost)}</div></div>
+          <div style="height:1px;background:#f0f2f5;margin:8px 0;border-radius:2px"></div>
+          <div style="font-weight:800;font-size:18px" class="total-row"><div>Total</div><div>${formatRp(order.total)}</div></div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn" id="downloadPdfBtn">Download PDF</button>
+          <button class="btn ghost" id="sendToWaBtn">Kirim ke WhatsApp</button>
+        </div>
+      `;
+
+      invoiceContainer.appendChild(card);
+
+      document.getElementById('downloadPdfBtn').addEventListener('click', ()=>{
+        generatePdf(orderId, order);
+      });
+
+      document.getElementById('sendToWaBtn').addEventListener('click', ()=>{
+        const waMsg = buildWhatsAppMessage(orderId, order);
+        const SELLER_NUMBER = ''; // ganti jika ingin arahkan langsung ke nomor penjual
+        const waUrl = SELLER_NUMBER ? `https://wa.me/${SELLER_NUMBER}?text=${encodeURIComponent(waMsg)}` : `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
+        window.open(waUrl, '_blank');
+      });
+
+      if(focus){
+        card.scrollIntoView({behavior:'smooth'});
+      }
+    }
+
+    // generate simple PDF using jsPDF
+    async function generatePdf(orderId, order){
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({unit:'pt', format:'a4'});
+        const left = 40;
+        let y = 40;
+        doc.setFontSize(18);
+        doc.text(`Invoice: ${orderId}`, left, y); y += 22;
+        doc.setFontSize(11);
+        doc.text(`Tanggal: ${new Date(order.createdAt).toLocaleString('id-ID')}`, left, y); y += 18;
+        doc.text(`Nama: ${order.customer.name}`, left, y); y += 14;
+        if(order.customer.address) { doc.text(`Alamat: ${order.customer.address}`, left, y); y += 14; }
+        doc.text(`HP: ${order.customer.phone}`, left, y); y += 18;
+
+        // table header
+        y += 6;
+        doc.setFontSize(12);
+        doc.text('Produk', left, y);
+        doc.text('Qty', 360, y);
+        doc.text('Harga', 420, y);
+        doc.text('Subtotal', 500, y);
+        y += 6;
+        doc.setLineWidth(0.5);
+        doc.line(left, y, 560, y);
+        y += 12;
+
+        doc.setFontSize(11);
+        order.items.forEach(it=>{
+          if(y > 750){ doc.addPage(); y = 40; }
+          doc.text(it.title, left, y);
+          doc.text(String(it.qty), 360, y);
+          doc.text(String(it.price), 420, y);
+          doc.text(String(it.price * it.qty), 500, y);
+          y += 14;
+        });
+
+        y += 12;
+        doc.setLineWidth(0.5);
+        doc.line(left, y, 560, y);
+        y += 14;
+        doc.text(`Subtotal: ${order.subtotal}`, left, y); y += 14;
+        doc.text(`Ongkos kirim: ${order.shipping_cost}`, left, y); y += 14;
+        doc.setFontSize(14);
+        doc.text(`Total: ${order.total}`, left, y);
+
+        doc.save(`invoice_${orderId}.pdf`);
+      } catch(err){
+        console.error('PDF error', err);
+        alert('Gagal membuat PDF.');
+      }
+    }
+
+    /**************************************************************************
+     * Init
+     **************************************************************************/
+    loadCart();
+
+    // preview invoice button initially hidden
+    document.getElementById('previewInvoiceBtn').style.display = 'none';
+
+    // small helper: if cart is modified in another tab, reload
+    window.addEventListener('storage', (e)=>{
+      if(e.key === CART_KEY) loadCart();
+    });
+
+  </script>
+
+  <!--
+    Catatan integrasi untuk cookies.html:
+    - Agar halaman cookies.html "bridge" dengan halaman ini, pastikan saat user menekan "Tambah" pada cookies.html, Anda:
+      1) Membaca cart dari localStorage (key: cookieBakeryCart) atau buat baru jika tidak ada.
+      2) Tambahkan/level-up item sesuai {id, title, price, qty, img}
+      3) Simpan kembali ke localStorage setItem('cookieBakeryCart', JSON.stringify(cart));
+      4) Update tampilan jumlah keranjang bila perlu.
+
+    Contoh snippet singkat (masukkan ke dalam cookies.html, di tempat yang menambahkan item ke keranjang):
+
+    function addToCartFromProducts(prod){
+      // prod = {id, title, price, img}
+      const KEY = 'cookieBakeryCart';
+      const raw = localStorage.getItem(KEY);
+      let c = raw ? JSON.parse(raw) : [];
+      const idx = c.findIndex(x => String(x.id) === String(prod.id));
+      if(idx > -1){
+        c[idx].qty = (c[idx].qty || 1) + 1;
+      } else {
+        c.push({id: prod.id, title: prod.title, price: prod.price, qty: 1, img: prod.img});
+      }
+      localStorage.setItem(KEY, JSON.stringify(c));
+      // update cart count UI jika ada (contoh: cartBtn)
+      const totalItems = c.reduce((s,i) => s + (i.qty||0), 0);
+      const cartBtn = document.getElementById('cart-btn');
+      if(cartBtn) cartBtn.textContent = `Keranjang (${totalItems})`;
+    }
+
+    - Jika Anda ingin saya juga update file cookies.html untuk menyimpan ke localStorage secara otomatis, beri tahu — saya akan tambahkan snippet yang cocok dengan kode sebelumnya.
+    - Jika ingin WA diarahkan ke nomor penjual otomatis, ganti variable SELLER_NUMBER di kode menjadi nomor internasional tanpa tanda +, misal: '6281234567890'.
+
+    Keamanan & privasi:
+    - Config Firebase yang Anda berikan tersimpan di file client-side; ini umum untuk Firebase tetapi pastikan rules Realtime Database Anda di-set dengan bijak (mis. batasi write/read jika perlu).
+    - Jika butuh autentikasi admin atau proteksi, kita bisa tambahkan Firebase Auth / Cloud Functions nanti.
+
+  -->
 
 </body>
 </html>
