@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cookie Shop — Produk</title>
+  <meta name="description" content="Daftar cookies & snack. Filter harga, tag, dan urutkan produk." />
+
+  <style>
+    :root{
+      --accent:#c4553b;
+      --muted:#6b7280;
+      --bg:#f6f8fa;
+      --card:#ffffff;
+      --radius:12px;
+      --max-width:1180px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:#111;line-height:1.4}
+    .container{max-width:var(--max-width);margin:28px auto;padding:0 18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#f8a07a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
+    nav ul{display:flex;gap:14px;list-style:none;padding:0;margin:0}
+    nav a{color:var(--muted);text-decoration:none;font-weight:600}
+    .actions{display:flex;gap:10px;align-items:center}
+    .btn{background:var(--card);border:1px solid #e6e9ef;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border:0}
+    .breadcrumb{font-size:13px;color:var(--muted);margin:10px 0 18px}
+
+    .layout{display:grid;grid-template-columns:300px 1fr;gap:20px}
+    /* Responsive */
+    @media (max-width:900px){ .layout{grid-template-columns:1fr} .sidebar{order:2} .main{order:1} }
+
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:0 6px 18px rgba(12,20,40,0.06);padding:16px}
+
+    /* Sidebar */
+    .sidebar .section{margin-bottom:16px}
+    .price-range{display:flex;gap:8px}
+    .price-range input{flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+    .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .tag{padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #eceff4;font-size:13px;cursor:pointer}
+    .tag.active{background:var(--accent);color:#fff;border:0}
+
+    /* Main area */
+    .controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px}
+    .controls .left{color:var(--muted)}
+    .sort-select{padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+
+    .products{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    @media (max-width:1100px){.products{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:640px){.products{grid-template-columns:repeat(1,1fr)}}
+
+    .product{border-radius:12px;overflow:hidden;background:var(--card);display:flex;flex-direction:column}
+    .product img{width:100%;height:200px;object-fit:cover;display:block}
+    .product .body{padding:12px;flex:1;display:flex;flex-direction:column}
+    .product h4{margin:0 0 6px;font-size:16px}
+    .price-row{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .price{font-weight:700;color:var(--accent)}
+    .add-cart{padding:8px 10px;border-radius:8px;border:0;background:#111;color:#fff;cursor:pointer}
+
+    .pagination{display:flex;gap:8px;justify-content:center;margin-top:18px}
+    .page-btn{padding:8px 12px;border-radius:8px;border:1px solid #e6e9ef;background:var(--card);cursor:pointer}
+    .page-btn.active{background:var(--accent);color:#fff;border:0}
+
+    footer{margin-top:28px;padding:18px 0;text-align:center;color:var(--muted);font-size:14px}
+    /* small helpers */
+    .muted{color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo">CB</div>
+        <div>
+          <div style="font-weight:800;font-size:18px">Cookie Bakery</div>
+          <div class="muted">Snacks untuk acara spesial</div>
+        </div>
+      </div>
+
+      <nav>
+        <ul>
+          <li><a href="#">Home</a></li>
+          <li><a href="#">Produk</a></li>
+          <li><a href="#">Promo</a></li>
+          <li><a href="#">Tentang</a></li>
+          <li><a href="#">Outlet</a></li>
+        </ul>
+      </nav>
+
+      <div class="actions">
+        <button class="btn">Download Katalog</button>
+        <button class="btn primary" id="cart-btn">Keranjang (0)</button>
+      </div>
+    </header>
+
+    <div class="breadcrumb">Home / Cookies</div>
+
+    <div class="layout">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="card">
+          <h3 style="margin:0 0 10px">Filter Harga</h3>
+          <div class="section">
+            <div class="price-range">
+              <input type="number" id="minPrice" placeholder="Min (Rp)" />
+              <input type="number" id="maxPrice" placeholder="Max (Rp)" />
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn" id="apply-price">Filter</button>
+              <button class="btn" id="clear-price">Reset</button>
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #f0f2f5;margin:12px 0">
+
+          <h3 style="margin:0 0 10px">Tags</h3>
+          <div class="tags" id="tagContainer">
+            <div class="tag" data-tag="manis">Manis</div>
+            <div class="tag" data-tag="asin">Asin</div>
+            <div class="tag" data-tag="keju">Keju</div>
+            <div class="tag" data-tag="oreo">Oreo</div>
+            <div class="tag" data-tag="kue">Kue</div>
+            <div class="tag" data-tag="new">New</div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #f0f2f5;margin:12px 0">
+
+          <h3 style="margin:0 0 10px">Kontak / Pesan</h3>
+          <div class="muted">Isi formulir singkat untuk pemesanan.</div>
+          <div style="margin-top:8px">
+            <input placeholder="Nama" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
+            <input placeholder="Telepon" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
+            <textarea placeholder="Pesan singkat" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef"></textarea>
+            <div style="margin-top:8px"><button class="btn primary">Kirim</button></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="main">
+        <div class="card">
+          <div class="controls">
+            <div class="left">
+              <span class="muted" id="resultCount">Menampilkan 12 produk</span>
+            </div>
+            <div>
+              <select id="sort" class="sort-select">
+                <option value="default">Urutan Normal</option>
+                <option value="popular">Urutkan Berdasar Popularitas</option>
+                <option value="latest">Sort by latest</option>
+                <option value="price-asc">Harga: Rendah ke Tinggi</option>
+                <option value="price-desc">Harga: Tinggi ke Rendah</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="products" id="productsGrid">
+            <!-- Produk akan di-render oleh JS -->
+          </div>
+
+          <div class="pagination" id="pagination">
+            <!-- pagination -->
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer>
+      © <span id="year"></span> Cookie Bakery — Semua hak cipta dilindungi.
+    </footer>
+  </div>
+
+  <script>
+    // Sample data (ganti dengan data nyata/loop server)
+    const products = [
+      {id:1,title:"Almond Bar Cookies",price:80000,tag:["manis"],img:"https://via.placeholder.com/600x400?text=Almond+Bar"},
+      {id:2,title:"Cheese Pastry Stick Box",price:35000,tag:["keju"],img:"https://via.placeholder.com/600x400?text=Cheese+Stick"},
+      {id:3,title:"Choco Pastry Stick Box",price:35000,tag:["choco"],img:"https://via.placeholder.com/600x400?text=Choco+Stick"},
+      {id:4,title:"Sugar Palm Pastry",price:35000,tag:["manis"],img:"https://via.placeholder.com/600x400?text=Sugar+Palm"},
+      {id:5,title:"Coklat Mente",price:80000,tag:["manis","oreo"],img:"https://via.placeholder.com/600x400?text=Coklat+Mente"},
+      {id:6,title:"Katetong Keju",price:70000,tag:["keju"],img:"https://via.placeholder.com/600x400?text=Katetong+Keju"},
+      {id:7,title:"Nastar Keju",price:95000,tag:["manis","keju"],img:"https://via.placeholder.com/600x400?text=Nastar+Keju"},
+      {id:8,title:"Putri Salju",price:85000,tag:["manis"],img:"https://via.placeholder.com/600x400?text=Putri+Salju"},
+      {id:9,title:"Vanilla Mente",price:80000,tag:["manis"],img:"https://via.placeholder.com/600x400?text=Vanilla+Mente"},
+      {id:10,title:"Choco Oreo Cookies",price:70000,tag:["oreo","manis"],img:"https://via.placeholder.com/600x400?text=Choco+Oreo"},
+      {id:11,title:"Kastengel",price:100000,tag:["keju"],img:"https://via.placeholder.com/600x400?text=Kastengel"},
+      {id:12,title:"Cheese Corn",price:100000,tag:["keju"],img:"https://via.placeholder.com/600x400?text=Cheese+Corn"}
+    ];
+
+    // State
+    let state = {
+      products,
+      filtered: [...products],
+      page: 1,
+      perPage: 9,
+      cartCount: 0,
+      activeTags: new Set(),
+      minPrice: null,
+      maxPrice: null
+    };
+
+    const productsGrid = document.getElementById('productsGrid');
+    const resultCount = document.getElementById('resultCount');
+    const pagination = document.getElementById('pagination');
+    const cartBtn = document.getElementById('cart-btn');
+
+    function renderProducts(){
+      const start = (state.page-1)*state.perPage;
+      const end = start + state.perPage;
+      const pageItems = state.filtered.slice(start,end);
+
+      productsGrid.innerHTML = pageItems.map(p => `
+        <article class="product card" data-id="${p.id}">
+          <img src="${p.img}" alt="${escapeHtml(p.title)}" loading="lazy">
+          <div class="body">
+            <h4>${escapeHtml(p.title)}</h4>
+            <div class="muted" style="font-size:13px">Tag: ${p.tag.join(', ')}</div>
+            <div class="price-row">
+              <div class="price">Rp ${numberWithCommas(p.price)}</div>
+              <button class="add-cart" data-id="${p.id}">Tambah</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      resultCount.textContent = `Menampilkan ${state.filtered.length} produk`;
+      renderPagination();
+      attachAddCartEvents();
+    }
+
+    function renderPagination(){
+      const total = Math.ceil(state.filtered.length / state.perPage) || 1;
+      let html = '';
+      for(let i=1;i<=total;i++){
+        html += `<button class="page-btn ${i===state.page?'active':''}" data-page="${i}">${i}</button>`;
+      }
+      pagination.innerHTML = html;
+      Array.from(pagination.querySelectorAll('.page-btn')).forEach(btn=>{
+        btn.addEventListener('click',()=>{ state.page = Number(btn.dataset.page); renderProducts(); });
+      });
+    }
+
+    function attachAddCartEvents(){
+      Array.from(document.querySelectorAll('.add-cart')).forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          state.cartCount++;
+          cartBtn.textContent = `Keranjang (${state.cartCount})`;
+          // simple add-to-cart feedback
+          btn.textContent = "✓";
+          setTimeout(()=>btn.textContent = "Tambah",700);
+        });
+      });
+    }
+
+    // Sorting
+    document.getElementById('sort').addEventListener('change', e=>{
+      const v = e.target.value;
+      if(v==='price-asc'){ state.filtered.sort((a,b)=>a.price-b.price); }
+      else if(v==='price-desc'){ state.filtered.sort((a,b)=>b.price-a.price); }
+      else if(v==='latest'){ state.filtered = state.filtered.slice().reverse(); }
+      else if(v==='popular'){ /* placeholder: stable */ }
+      else { state.filtered = applyAllFilters(); }
+      state.page = 1;
+      renderProducts();
+    });
+
+    // Tags
+    document.getElementById('tagContainer').addEventListener('click', e=>{
+      const tagEl = e.target.closest('.tag');
+      if(!tagEl) return;
+      const t = tagEl.dataset.tag;
+      if(state.activeTags.has(t)){ state.activeTags.delete(t); tagEl.classList.remove('active'); }
+      else { state.activeTags.add(t); tagEl.classList.add('active'); }
+      applyFiltersAndRender();
+    });
+
+    // Price filter
+    document.getElementById('apply-price').addEventListener('click',()=>{
+      const min = Number(document.getElementById('minPrice').value) || null;
+      const max = Number(document.getElementById('maxPrice').value) || null;
+      state.minPrice = min;
+      state.maxPrice = max;
+      applyFiltersAndRender();
+    });
+    document.getElementById('clear-price').addEventListener('click',()=>{
+      document.getElementById('minPrice').value = '';
+      document.getElementById('maxPrice').value = '';
+      state.minPrice = null;
+      state.maxPrice = null;
+      applyFiltersAndRender();
+    });
+
+    function applyAllFilters(){
+      return products.filter(p=>{
+        // tags
+        if(state.activeTags.size>0){
+          const intersect = p.tag.some(t=>state.activeTags.has(t));
+          if(!intersect) return false;
+        }
+        // price
+        if(state.minPrice!=null && p.price < state.minPrice) return false;
+        if(state.maxPrice!=null && p.price > state.maxPrice) return false;
+        return true;
+      });
+    }
+
+    function applyFiltersAndRender(){
+      state.filtered = applyAllFilters();
+      state.page = 1;
+      // reset sort select
+      document.getElementById('sort').value = 'default';
+      renderProducts();
+    }
+
+    // Utilities
+    function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+    function escapeHtml(text){ return text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // Initial render
+    document.getElementById('year').textContent = new Date().getFullYear();
+    renderProducts();
+
+    // keyboard shortcut: press "/" to focus first input
+    window.addEventListener('keydown', e=>{
+      if(e.key === '/') { e.preventDefault(); document.getElementById('minPrice').focus(); }
+    });
+
+  </script>
+</body>
+</html>
