@@ -207,6 +207,7 @@
     // -------------------------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
     import { getDatabase, ref, push, set } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+    const storage = getStorage(app);
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
@@ -570,11 +571,33 @@ function addToCart(product){
         waText += `%0ASubtotal: Rp ${numberWithCommas(subtotal)}%0ATotal: Rp ${numberWithCommas(total)}%0A%0A`;
         waText += `Terima kasih.`;
 
-        // also open printable invoice in new window
-        const invoiceHtml = generateInvoiceHtml(order);
-        const invWindow = window.open('', '_blank');
-        invWindow.document.write(invoiceHtml);
-        invWindow.document.close();
+      // convert invoice HTML to blob PDF
+      const pdfBlob = new Blob([generateInvoiceHtml(order)], { type: "application/pdf" });
+
+      // upload to firebase storage
+      const pdfFileRef = sRef(storage, `invoices/${invoiceNo}.pdf`);
+      await uploadBytes(pdfFileRef, pdfBlob);
+      const pdfUrl = await getDownloadURL(pdfFileRef);
+
+      // WhatsApp message with PDF link
+      let waText = `Halo, saya ingin memesan dari Cookie Bakery.%0A`;
+      waText += `Nomor Invoice: *${invoiceNo}*%0A`;
+      waText += `Link Invoice (PDF): ${encodeURIComponent(pdfUrl)}%0A%0A`;
+      waText += `Total Pembayaran: Rp ${numberWithCommas(total)}%0A`;
+      waText += `Nama: ${encodeURIComponent(name)}%0A`;
+      waText += `Alamat: ${encodeURIComponent(address)}%0A%0A`;
+      waText += `Detail Pesanan:%0A`;
+
+      order.items.forEach(it=>{
+        waText += `${it.qty} x ${encodeURIComponent(it.title)} - Rp ${numberWithCommas(it.price*it.qty)}%0A`;
+    });
+
+waText += `%0ATerima kasih.`;
+
+// send to WhatsApp
+const waUrl = `https://wa.me/${sellerPhoneForWaLink}?text=${waText}`;
+window.open(waUrl, '_blank');
+
 
         // open wa link
         const waUrl = `https://wa.me/${sellerPhoneForWaLink}?text=${waText}`;
