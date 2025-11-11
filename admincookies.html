@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Admin - Orders</title>
+
+<style>
+  body{font-family:Arial, sans-serif;background:#f6f7fb;margin:0;padding:20px;}
+  h1{margin-bottom:14px;}
+  .toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  input,select{padding:8px 10px;border-radius:6px;border:1px solid #ccc;}
+  table{width:100%;border-collapse:collapse;background:#fff;}
+  th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;}
+  th{background:#fafafa;}
+  tr:hover{background:#f1f1f1;}
+  .btn{padding:6px 12px;background:#c4553b;color:#fff;border:0;border-radius:6px;cursor:pointer}
+  .modal{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;transition:.2s;
+  }
+  .modal.open{opacity:1;pointer-events:auto;}
+  .modal-content{
+    background:#fff;padding:18px;border-radius:8px;width:500px;max-width:90%;
+    max-height:80vh;overflow:auto;
+  }
+  .close{float:right;cursor:pointer;font-weight:bold;}
+</style>
+</head>
+<body>
+
+<h1>📦 Dashboard Admin - Orders</h1>
+
+<div class="toolbar">
+  <input type="date" id="dateFilterStart">
+  <input type="date" id="dateFilterEnd">
+  <input type="text" placeholder="Cari invoice / nama..." id="searchInput">
+  <button class="btn" id="applyFilter">Filter</button>
+  <button class="btn" id="clearFilter" style="background:#777">Reset</button>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Tanggal</th>
+      <th>Invoice</th>
+      <th>Nama</th>
+      <th>Total</th>
+      <th>Status</th>
+      <th>Aksi</th>
+    </tr>
+  </thead>
+  <tbody id="orderTable"></tbody>
+</table>
+
+<!-- MODAL DETAIL -->
+<div class="modal" id="orderModal">
+  <div class="modal-content">
+    <span class="close" id="closeModal">✖</span>
+    <h3>Detail Pesanan</h3>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyBk57WWCAV9PbUQBb_bj7mPtl09oNz7WnA",
+  authDomain: "schesakra.firebaseapp.com",
+  databaseURL: "https://schesakra-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "schesakra",
+  storageBucket: "schesakra.appspot.com",
+  messagingSenderId: "672537227977",
+  appId: "1:672537227977:web:88b24f905c86eba7c05318"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// UI refs
+const orderTable = document.getElementById("orderTable");
+const searchInput = document.getElementById("searchInput");
+const dateStart = document.getElementById("dateFilterStart");
+const dateEnd = document.getElementById("dateFilterEnd");
+const applyFilterBtn = document.getElementById("applyFilter");
+const clearFilterBtn = document.getElementById("clearFilter");
+const modal = document.getElementById("orderModal");
+const detailContent = document.getElementById("detailContent");
+const closeModal = document.getElementById("closeModal");
+
+let orders = [];
+
+// Fetch orders live
+onValue(ref(db, "orders"), snapshot => {
+  orders = [];
+  snapshot.forEach(s => orders.push(s.val()));
+  renderTable();
+});
+
+// Format helper
+function fmt(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,".");}
+
+// Render table
+function renderTable(){
+  let filtered = orders;
+
+  // Search
+  const q = searchInput.value.toLowerCase();
+  if(q){
+    filtered = filtered.filter(o =>
+      o.invoiceNo.toLowerCase().includes(q) ||
+      o.customer.name.toLowerCase().includes(q)
+    );
+  }
+
+  // Date filter
+  if(dateStart.value){
+    filtered = filtered.filter(o => new Date(o.createdAt) >= new Date(dateStart.value));
+  }
+  if(dateEnd.value){
+    filtered = filtered.filter(o => new Date(o.createdAt) <= new Date(dateEnd.value+"T23:59"));
+  }
+
+  orderTable.innerHTML = filtered.map(o=>`
+    <tr>
+      <td>${new Date(o.createdAt).toLocaleDateString()}</td>
+      <td>${o.invoiceNo}</td>
+      <td>${o.customer.name}</td>
+      <td>Rp ${fmt(o.total)}</td>
+      <td>${o.status}</td>
+      <td><button class="btn" data-id="${o.invoiceNo}">Detail</button></td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll("button[data-id]").forEach(btn=>{
+    btn.onclick = ()=> showDetail(btn.dataset.id);
+  });
+}
+
+// Show modal detail
+function showDetail(inv){
+  const o = orders.find(x=>x.invoiceNo === inv);
+  detailContent.innerHTML = `
+    <p><b>Invoice:</b> ${o.invoiceNo}</p>
+    <p><b>Tanggal:</b> ${new Date(o.createdAt).toLocaleString()}</p>
+    <p><b>Nama:</b> ${o.customer.name}</p>
+    <p><b>Telepon:</b> ${o.customer.phone}</p>
+    <p><b>Alamat:</b> ${o.customer.address}</p>
+    <hr>
+    <h4>Items:</h4>
+    ${o.items.map(i=>`${i.qty} x ${i.title} = Rp ${fmt(i.lineTotal)}<br>`).join("")}
+    <hr>
+    <p><b>Total:</b> Rp ${fmt(o.total)}</p>
+  `;
+  modal.classList.add("open");
+}
+
+closeModal.onclick = ()=> modal.classList.remove("open");
+applyFilterBtn.onclick = renderTable;
+clearFilterBtn.onclick = ()=>{
+  searchInput.value = "";
+  dateStart.value = "";
+  dateEnd.value = "";
+  renderTable();
+};
+
+</script>
+
+</body>
+</html>
