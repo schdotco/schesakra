@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Awal - Schesakra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #C4553B;
+    --bg: #f9f9f9;
+    --text: #222;
+    --muted: #666;
+    font-family: "Inter", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    padding: 20px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+  .card-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
+    max-width: 900px;
+    width: 100%;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    padding: 30px;
+    flex: 1 1 320px;
+    max-width: 400px;
+    text-align: center;
+    transition: all .25s;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  }
+  .card h2 {
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: var(--accent);
+  }
+  .card p {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 20px;
+  }
+  .btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .25s;
+  }
+  .btn:hover { background: #a13f2d; }
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>🍪 Dashboard Awal - Schesakra</header>
+
+<main>
+  <div class="card-container">
+    <div class="card">
+      <h2>Admin Dashboard</h2>
+      <p>Kelola data, pesanan, dan laporan penjualan dari sistem utama Schesakra.</p>
+      <a href="https://schdotco.github.io/schesakra/" class="btn">Masuk ke Admin</a>
+    </div>
+
+    <div class="card">
+      <h2>Cookie Bakery</h2>
+      <p>Belanja cookies premium, buat pesanan, dan kirim langsung melalui WhatsApp.</p>
+      <a href="https://schdotco.github.io/schesakra/cookies.html" class="btn">Buka Toko Cookies</a>
+    </div>
+  </div>
+</main>
+
+<footer>© 2025 Schesakra Group — Semua hak cipta dilindungi.</footer>
+
+</body>
+</html>
