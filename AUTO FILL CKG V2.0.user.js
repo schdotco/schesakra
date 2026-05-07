@@ -1,9 +1,3 @@
-// ==UserScript==
-// @name          AUTO FILL CKG - FINAL ULTIMATE FIX
-// @match         https://sehatindonesiaku.kemkes.go.id/*
-// @grant         GM_xmlhttpRequest
-// ==/UserScript==
-
 (function() {
 'use strict';
 
