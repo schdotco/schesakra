@@ -10,8 +10,8 @@ const SHEETS = [
         gids: ["2065767248"],
         colNama: 3, colTgl: 6, colWA: 5, colJK: 8, colPekerjaan: 9, colKelurahan: 10,
         colKelas: 6,
-        colAlamat: 14,
-        colMartial: 15,
+        colAlamat: 12,
+        colMartial: 13,
         waStatis: true
     },
     {
