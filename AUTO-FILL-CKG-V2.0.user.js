@@ -1,75 +1,124 @@
-(function() {
+(function () {
 'use strict';
 
-const wait = ms => new Promise(r => setTimeout(r, ms));
+function wait(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
-/* ================= CONFIG PER SHEET ================= */
+/* ================= CONFIG SPREADSHEET ================= */
 const SHEETS = [
     {
-        // SPREADSHEET 1 
         id: "1kDShNBXFk3QtrrGaEX0fTjmRd1zGjb0s9n21a_1oHSM",
         gids: ["2065767248"],
-        colNama: 3, colTgl: 6, colWA: 5, colJK:8, colAlamat: 13, colPekerjaan: 9, colKelurahan: 10,
-        waStatis: true // Penanda bahwa WA diambil dari D2
+        colNama: 3, colTgl: 6, colWA: 5, colJK: 8, colPekerjaan: 9, colKelurahan: 10,
+        colKelas: 6,
+        colAlamat: 15,
+        colDisabilitas: 11,
+        waStatis: true
     },
     {
-        // SPREADSHEET 2 (Data Normal)
         id: "167bRhDc_SniwuCmYvmkdDXtvlu1oQ6wVCeZiESwo0sI",
-        gids: ["126079672","1947531650","1920180130"],
-        colNama: 4, colJK:5, colTgl: 9, colWA: 12, colAlamat: 11,
+        gids: ["126079672", "1947531650", "1920180130"],
+        colNama: 4, colJK: 5, colTgl: 9, colWA: 12, colAlamat: 11, colSekolah: 3, // -> Sudah ditambahkan koma (Fix)
+        colKelas: 6,
+        colDisabilitas: 15,
         waStatis: false
     }
 ];
 
-/* ================= GLOBAL DATA ================= */
-let currentData = null;
-
-/* ================= UI LOADING ================= */
+let isProcessing = false;
 let loadingEl = null;
+let currentScrapedData = null;
+
+/* ================= LOADING SCREEN ================= */
 function showLoading(text){
-    if(loadingEl) return;
+    if(loadingEl) { loadingEl.querySelector('#loadText').innerHTML = text; return; }
     loadingEl = document.createElement("div");
-    loadingEl.style = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999999; display:flex; align-items:center; justify-content:center; color:#00ff88; font-size:20px; font-weight:bold; flex-direction:column; text-align:center;`;
-    loadingEl.innerHTML = `<div style="background:#111; padding:20px; border-radius:10px; border:2px solid #00ff88;">${text}<br><br><div class="loader" style="margin:auto;"></div></div>`;
+    loadingEl.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;color:#00ff88;font-size:20px;font-weight:bold;text-align:center;flex-direction:column;";
+    loadingEl.innerHTML = `<div style="background:#111;padding:30px;border-radius:12px;border:3px solid #00ff88;box-shadow:0 0 20px #00ff88;"><span id="loadText">${text}</span><br><br><div style="margin:auto;border:6px solid #333;border-top:6px solid #00ff88;border-radius:50%;width:50px;height:50px;animation:spin 1s linear infinite;"></div></div>`;
     document.body.appendChild(loadingEl);
 }
 function hideLoading(){ if(loadingEl){ loadingEl.remove(); loadingEl = null; } }
+const style = document.createElement('style'); style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }`; document.head.appendChild(style);
 
-const style = document.createElement("style");
-style.innerHTML = `.loader { border: 5px solid #ccc; border-top: 5px solid #00ff88; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; } @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }`;
-document.head.appendChild(style);
+/* ================= LOGIKA DATA & SAFE CLICK ================= */
+const normalizeNIK = v => String(v || "").replace(/\D/g, '');
 
-/* ================= LOGIKA DATA ================= */
-const normalizeNIK = v => String(v||"").replace(/\D/g,'');
+function sikatReactInput(element, value){
+    if(!element) return;
+    const setter = Object.getOwnPropertyDescriptor(element.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype, 'value').set;
+    if(setter){
+        setter.call(element, value);
+        element.dispatchEvent(new Event('input', { bubbles:true }));
+        element.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+}
 
+function forceInject(element, value) {
+    if (!element) return;
+    element.removeAttribute('disabled');
+    element.removeAttribute('readonly');
+    sikatReactInput(element, value);
+}
+
+function getInput(keyword){
+    const inputs = Array.from(document.querySelectorAll("input, textarea"));
+    let target = inputs.find(i => (i.placeholder || "").toLowerCase().includes(keyword.toLowerCase()));
+    if(target) return target;
+    const labels = Array.from(document.querySelectorAll('.ant-form-item-label label'));
+    const label = labels.find(l => l.innerText.toLowerCase().includes(keyword.toLowerCase()));
+    if (label) {
+        const row = label.closest('.ant-form-item');
+        if (row) return row.querySelector('input, textarea');
+    }
+    return null;
+}
+
+// Ritme klik manusia untuk elemen statis non-dropdown
+function safeClick(el) {
+    if (!el) return false;
+    try {
+        el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true}));
+        setTimeout(() => {
+            el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true}));
+            el.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
+        }, 40);
+        return true;
+    } catch(e) { return false; }
+}
+
+/* ================= TARIK DATA ================= */
 async function cariData(nikInput){
     const target = normalizeNIK(nikInput);
     for(const source of SHEETS){
         for(const gid of source.gids){
             const csv = await new Promise(resolve => {
                 GM_xmlhttpRequest({
-                    method:"GET",
-                    url:`https://docs.google.com/spreadsheets/d/${source.id}/export?format=csv&gid=${gid}`,
-                    onload:r=>resolve(r.responseText)
+                    method: "GET",
+                    url: `https://docs.google.com/spreadsheets/d/${source.id}/export?format=csv&gid=${gid}`,
+                    timeout: 10000,
+                    onload: r => resolve(r.responseText || ""),
+                    onerror: () => resolve("")
                 });
             });
-            const rows = csv.split("\n").map(r => r.split(","));
 
-            // Ambil WA Statis dari D2 jika disetting true
+            if (!csv || csv.trim() === "") continue;
+            const rows = csv.trim().split(/\r?\n/).map(r => r.split(","));
             let waD2 = (source.waStatis && rows[1]) ? normalizeNIK(rows[1][3]) : "";
 
-            for(let i=1; i<rows.length; i++){
+            for(let i = 1; i < rows.length; i++){
                 const row = rows[i];
                 if(row.find(col => normalizeNIK(col) === target)){
                     return {
                         nik: target,
                         nama: (row[source.colNama] || "").trim(),
-                        tgl: (row[source.colTgl] || "").replace(/\//g, '-').trim(),
+                        tgl: (row[source.colTgl] || "").trim(),
                         hp: waD2 || (row[source.colWA] || "").replace(/\D/g,''),
-                        jk: (row[source.colJK] || "").toLowerCase().startsWith("p") ? "Perempuan" : "Laki-laki",
-                        alamat: (row[source.colAlamat] || "-"),
-                        pekerjaan: (row[source.colPekerjaan] || "-"),
-                        kelurahan: (row[source.colKelurahan] || "-")
+                        jk: (row[source.colJK] || "").trim(),
+                        alamat: row[source.colAlamat] || "-",
+                        pekerjaan: row[source.colPekerjaan] || "-",
+                        kelurahan: row[source.colKelurahan] || "-",
+                        sekolah: row[source.colSekolah] || "-",
+                        disabilitas: (row[source.colDisabilitas] || "").trim(),
+                        kelas: (row[source.colKelas] || "").trim()
                     };
                 }
             }
@@ -78,79 +127,354 @@ async function cariData(nikInput){
     return null;
 }
 
-/* ================= SIMULASI KETIKAN ================= */
-async function simulateTyping(el, text) {
-    if(!el || !text) return;
-    el.focus(); el.value = "";
-    for(let c of String(text)){ el.value += c; el.dispatchEvent(new Event("input",{bubbles:true})); await wait(15); }
-    el.dispatchEvent(new Event("change",{bubbles:true})); el.blur();
-}
-
-/* ================= EKSEKUSI PER HALAMAN ================= */
-async function runHal1(){
-    const nik = document.getElementById("nikAI").value;
-    if(!nik) return alert("Isi NIK!");
-    showLoading("🔍 Mencari Data...");
-    currentData = await cariData(nik);
-    if(!currentData) { alert("NIK Tidak Ada!"); hideLoading(); return; }
-
-    const getInp = (k) => [...document.querySelectorAll("input, textarea")].find(i => i.placeholder?.toLowerCase().includes(k) || i.name?.toLowerCase().includes(k));
-
-    await simulateTyping(getInp("nik"), currentData.nik);
-    const btnCek = document.evaluate("//button[contains(., 'Cek NIK')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-    if(btnCek) { btnCek.click(); await wait(1500); }
-
-    await simulateTyping(getInp("nama lengkap"), currentData.nama);
-    // Tambahkan pengaman agar tidak error jika hp kosong
-    let cleanHP = (currentData.hp || "").replace(/^0/, "");
-    await simulateTyping(getInp("whatsapp"), cleanHP);
-
-document.getElementById("infoAI").innerHTML = `
-    <b style="color:#00ff88;">HAL 1 OK</b><br>
-    <b>WA:</b> ${currentData.hp}<br>
-    <b>Tgl:</b> ${currentData.tgl}<br>
-    <b>JK:</b> <span style="color:#fff; background:#444; padding:2px 5px;">${currentData.jk}</span>
-`;
-    hideLoading();
-}
-
-async function runHal2(){
-    if(!currentData) return alert("Cari NIK dulu!");
-    const getInp = (k) => [...document.querySelectorAll("input, textarea")].find(i => i.placeholder?.toLowerCase().includes(k) || i.name?.toLowerCase().includes(k));
-    const inpDet = getInp("detail alamat") || getInp("domisili") || getInp("alamat");
-
-    if(inpDet) {
-        await simulateTyping(inpDet, currentData.alamat);
+/* ================= UPGRADE ENGINE SMART DROPDOWN (STABILIZED REAL CLICK) ================= */
+async function smartClickDropdown(labelText, valueText) {
+    if (!valueText || String(valueText).trim() === "" || valueText === "-") {
+        console.log(`[BOT] Data untuk dropdown "${labelText}" kosong. Melewati...`);
+        return false;
     }
 
-    // Tampilkan informasi lengkap di Halaman 2
-    document.getElementById("infoAI").innerHTML = `
-        <b style="color:#ffcc00;">HAL 2 OK</b><br>
-        <div style="background:#222; padding:5px; border:1px solid #444; margin-top:5px; font-size:11px; line-height:1.5;">
-            <b>Pekerjaan:</b> ${currentData.pekerjaan}<br>
-            <b>Kelurahan:</b> ${currentData.kelurahan}<br>
-            <hr style="border:0; border-top:1px solid #444;">
-            <b>Alamat:</b><br>${currentData.alamat}
-        </div>
-    `;
+    // Ambil data mentah dari spreadsheet dan bersihkan spasi di ujungnya
+    let rawSheetText = String(valueText).trim().toUpperCase();
+    let targetText = String(valueText).trim(); // Default teks pencarian
+
+    // 🔄 KONVERTER KAPITAL OTOMATIS (Menyelaraskan SHeet vs Web Kemenkes)
+    if (labelText.toLowerCase().includes("jenis kelamin")) {
+        if (rawSheetText.startsWith("LAKI")) targetText = "Laki-laki";
+        if (rawSheetText.startsWith("PEREMPUAN") || rawSheetText.startsWith("PEREM")) targetText = "Perempuan";
+    }
+    else if (labelText.toLowerCase().includes("disabilitas")) {
+        if (rawSheetText.startsWith("TIDAK")) targetText = "Tidak Disabilitas";
+    }
+
+    // 1. Cari elemen label komponen dropdown (Jenis Kelamin, Disabilitas, dll)
+    const labels = Array.from(document.querySelectorAll('.ant-form-item-label label'));
+    const label = labels.find(l => l.innerText.toLowerCase().includes(labelText.toLowerCase()));
+    if (!label) return false;
+
+    const container = label.closest('.ant-form-item');
+    if (!container) return false;
+
+    const selector = container.querySelector('.ant-select-selector');
+    if (!selector) return false;
+
+    // 2. KLIK PEMICU DROPDOWN (Sama seperti await dropdownJK.click())
+    selector.scrollIntoView({ behavior: "smooth", block: "center" });
+    await wait(200);
+
+    selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    await wait(60);
+    selector.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    await wait(60);
+
+    // 3. TUNGGU TIMEOUT ANIMASI DROPDOWN (Sama seperti await page.waitForTimeout(500))
+    let retries = 15;
+    while (retries > 0) {
+        await wait(300);
+
+        // Ambil semua elemen opsi dropdown yang muncul di layar (.ant-select-item-option-content)
+        const semuaOpsiGlobal = Array.from(document.querySelectorAll('.ant-select-item-option-content'));
+
+        // Saring elemen yang COCOK MURNI (Case-Sensitive) dengan teks target yang sudah dikonversi
+        // Ini kloningan murni dari locator(`text="${targetText}"`) Playwright Anda
+        const opsiCocok = semuaOpsiGlobal.filter(el => el && el.innerText && el.innerText.trim() === targetText);
+
+        if (opsiCocok.length > 0) {
+            // 4. AMBIL ELEMEN URUTAN PALING AKHIR (Sama seperti .last() di Playwright)
+            const targetOpsiAkhir = opsiCocok.pop();
+
+            if (targetOpsiAkhir) {
+                // Ambil pembungkus baris opsi agar kliknya presisi dan state React tersimpan
+                const opsiWrapper = targetOpsiAkhir.closest('.ant-select-item-option') || targetOpsiAkhir;
+
+                opsiWrapper.scrollIntoView({ behavior: "auto", block: "nearest" });
+                await wait(50);
+
+                // 5. EKSEKUSI REAL CLICK PADA OPSI (Sama seperti await opsiJK.click())
+                opsiWrapper.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window }));
+                await wait(150);
+                opsiWrapper.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                await wait(60);
+                opsiWrapper.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                await wait(60);
+
+                if (typeof opsiWrapper.click === 'function') opsiWrapper.click();
+                else opsiWrapper.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+                // 6. JEDA AKHIR ANIMASI DROPDOWN MENUTUP (Sama seperti await page.waitForTimeout(300))
+                await wait(300);
+                console.log(`[BOT] Sukses konversi & kloning Playwright untuk "${labelText}" -> ${targetText}`);
+                return true;
+            }
+        }
+        retries--;
+    }
+
+    // Tutup paksa jika gagal agar form tidak berantakan
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    document.body.click();
+    return false;
 }
 
-/* ================= UI INIT ================= */
+/* ================= EKSEKUSI HALAMAN 2 ================= */
+async function eksekusiHalamanDua(data) {
+    showLoading("⚡ MENGISI HALAMAN 2... ⚡<br><span style='font-size:14px;color:#fff;'>Sinkronisasi data...</span>");
+    await wait(1500);
+
+    // 1. Disabilitas
+    let nilaiDisabilitas = data.disabilitas || "Tidak Disabilitas";
+    await smartClickDropdown("Disabilitas", nilaiDisabilitas);
+
+    // 2. Pencarian Sekolah
+    const labelSekolah = Array.from(document.querySelectorAll('.ant-form-item-label label')).find(l => l.innerText.toLowerCase().includes('sekolah'));
+    if (labelSekolah) {
+        const containerSekolah = labelSekolah.closest('.ant-form-item');
+        if (containerSekolah) {
+            const triggerSekolah = containerSekolah.querySelector('.ant-select-selector') || containerSekolah.querySelector('input') || containerSekolah.querySelector('button') || containerSekolah;
+            if (triggerSekolah) {
+                triggerSekolah.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                safeClick(triggerSekolah);
+                showLoading("⏳ Menunggu Pop-up Sekolah terbuka...");
+
+                let inputCariSekolah = null;
+                let btnSubmitCari = null;
+
+                for(let i = 0; i < 10; i++) {
+                    await wait(500);
+                    inputCariSekolah = document.querySelector('.ant-modal-content input');
+                    btnSubmitCari = document.querySelector('.ant-modal-content button.ant-input-search-button') || document.querySelector('.ant-modal-content button.ant-btn-primary') || Array.from(document.querySelectorAll('.ant-modal-content button')).find(b => b.querySelector('.anticon-search'));
+
+                    if (inputCariSekolah && btnSubmitCari) break;
+                }
+
+                if (inputCariSekolah && btnSubmitCari) {
+                    forceInject(inputCariSekolah, data.sekolah); // Menggunakan variabel data.sekolah yang benar sesuai penarikan
+                    await wait(500);
+
+                    btnSubmitCari.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    safeClick(btnSubmitCari);
+
+                    showLoading("⏳ Mencari Sekolah di database Kemenkes...");
+                    await wait(3000);
+
+                    let hasilPertama = null;
+                    for(let i = 0; i < 8; i++) {
+                        await wait(500);
+                        hasilPertama = document.querySelector('.ant-modal-content .ant-list-item button') || document.querySelector('.ant-modal-content .ant-list-item');
+                        if (hasilPertama) break;
+                    }
+
+                    if (hasilPertama) {
+                        hasilPertama.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        safeClick(hasilPertama);
+                        await wait(1000);
+                    } else {
+                        const btnClose = document.querySelector('.ant-modal-close');
+                        if (btnClose) safeClick(btnClose);
+                    }
+                }
+            }
+        }
+    }
+
+    showLoading("⚡ MEMILIH JENJANG & KELAS... ⚡");
+
+    // 3. Jenjang Pendidikan & Kelas
+    await smartClickDropdown("Pendidikan", data.kelas);
+    await smartClickDropdown("Kelas", data.kelas);
+
+    // 4. Checkbox Alamat Sama KTP
+    const checkboxSamaKTP = Array.from(document.querySelectorAll('.ant-checkbox-wrapper')).find(el => el.innerText.toLowerCase().includes('sama dengan alamat ktp'));
+    if (checkboxSamaKTP) {
+        if (!checkboxSamaKTP.className.includes('ant-checkbox-wrapper-checked') && !checkboxSamaKTP.querySelector('.ant-checkbox-checked')) {
+            checkboxSamaKTP.scrollIntoView({ behavior: "smooth", block: "center" });
+            checkboxSamaKTP.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            safeClick(checkboxSamaKTP);
+            await wait(500);
+        }
+    }
+
+    // 5. DETAIL ALAMAT
+    showLoading("⚡ MENYUNTIKKAN ALAMAT... ⚡");
+
+    let inpAlamat = document.querySelector('textarea[placeholder*="alamat" i]')
+                 || document.querySelector('textarea[placeholder*="domisili" i]')
+                 || getInput("detail alamat")
+                 || getInput("domisili")
+                 || getInput("alamat")
+                 || document.querySelector('textarea');
+
+    if (inpAlamat) {
+        inpAlamat.scrollIntoView({ behavior: "smooth", block: "center" });
+        safeClick(inpAlamat);
+        await wait(300);
+
+        forceInject(inpAlamat, data.alamat);
+
+        inpAlamat.dispatchEvent(new Event('input', { bubbles:true }));
+        inpAlamat.dispatchEvent(new Event('change', { bubbles:true }));
+        inpAlamat.blur();
+        await wait(300);
+    }
+}
+
+/* ================= SISTEM SEMI AUTO-PILOT ================= */
+async function autoPilotSikatHabis(data) {
+    currentScrapedData = data;
+
+    showLoading("⚡ AUTO-PILOT AKTIF ⚡<br><span style='font-size:14px;color:#fff;'>Mengisi NIK...</span>");
+
+    const btnTambah = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tambah Baru') || b.innerText.includes('Tambah Peserta'));
+    if (btnTambah && !document.querySelector('.ant-modal-content')) {
+        safeClick(btnTambah);
+        await wait(1500);
+    }
+
+    const inpNIK = getInput("nik");
+    if (inpNIK) {
+        forceInject(inpNIK, data.nik);
+        await wait(300);
+        const btnCek = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Cek NIK') || b.innerText.includes('Cari'));
+        if (btnCek) safeClick(btnCek);
+    }
+
+    showLoading("⏳ Menunggu Dukcapil Mereset Form...");
+    await wait(5000);
+
+    showLoading("⚡ MENGISI DATA AWAL... ⚡");
+
+    let inpNama = getInput("nama lengkap");
+    if (inpNama) forceInject(inpNama, data.nama);
+
+    let cleanHP = (data.hp || "").replace(/^0/, "");
+    let inpWA = getInput("whatsapp") || getInput("telepon");
+    if (inpWA) forceInject(inpWA, cleanHP);
+
+    // EKSEKUSI DROPDOWN JENIS KELAMIN HALAMAN 1 (RITME BARU AMAN STABIL)
+    await smartClickDropdown("Jenis Kelamin", data.jk);
+
+    hideLoading();
+    document.getElementById("infoAI").innerHTML = `
+        <div style="background:#ffcc00; color:#000; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:8px; animation: pulse 1.5s infinite;">
+            ⏳ TGL LAHIR ISI MANUAL!
+        </div>
+        <div style="background:#222; border:1px solid #555; padding:8px; border-radius:5px; font-size:12px; line-height:1.6;">
+            <b>📌 CONTEKAN DATA:</b><br>
+            • Tgl Lahir: <b style="color:#00ff88; font-size:14px;">${data.tgl}</b><br>
+            • Kelamin: <b style="color:#00ff88;">${data.jk}</b><br>
+            • Sekolah: <b style="color:#00ff88;">${data.sekolah}</b><br>
+            • Kelas: <b style="color:#00ff88;">${data.kelas}</b>
+        </div>
+        <div style="margin-top:8px; font-size:11px; color:#aaa; text-align:center;">Bot memantau tombol <b>'Selanjutnya'</b>...</div>
+    `;
+
+    let btnLanjut = null;
+    while (true) {
+        btnLanjut = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Selanjutnya'));
+        if (btnLanjut && !btnLanjut.disabled && !btnLanjut.classList.contains('ant-btn-disabled')) {
+            break;
+        }
+        await wait(500);
+    }
+
+    safeClick(btnLanjut);
+
+    document.getElementById("infoAI").innerHTML = `
+        <div style="background:#ff3333; color:#fff; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:8px; animation: pulse 1.5s infinite;">
+            🚨 KLIK 'SIMPAN' DI LAYAR! 🚨
+        </div>
+        <div style="font-size:12px; color:#ccc; text-align:center; margin-bottom:10px;">Jika Halaman 2 sudah terbuka, klik tombol hijau di bawah ini:</div>
+        <button id="btnGasHal2" style="width:100%; padding:12px; background:#00ff88; color:#000; font-size:14px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow: 0 0 15px #00ff88; text-transform:uppercase;">🚀 GAS ISI HALAMAN 2</button>
+    `;
+
+    document.getElementById("btnGasHal2").onclick = async () => {
+        document.getElementById("infoAI").innerHTML = `<div style="text-align:center; color:#ffcc00; font-weight:bold;">Memproses Halaman 2...</div>`;
+        await eksekusiHalamanDua(currentScrapedData);
+        hideLoading();
+        document.getElementById("infoAI").innerHTML = `
+            <div style="background:#00ff88; color:#000; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:5px;">
+                ✅ SELURUH FORM TERISI!
+            </div>
+            <b>Nama:</b> ${currentScrapedData.nama}<br>
+            <b>Sekolah:</b> ${currentScrapedData.sekolah}<br>
+            <b>Kelas:</b> ${currentScrapedData.kelas}
+        `;
+    };
+}
+
+/* ================= UI KONTROL & DRAGGABLE LOGIC ================= */
 function initUI(){
     if(document.getElementById("ai-box")) return;
+
     const box = document.createElement("div");
     box.id = "ai-box";
-    box.style = `position:fixed; bottom:140px; left:10px; background:#111; color:#fff; padding:12px; border-radius:10px; z-index:99999; box-shadow: 0 0 10px #00ff88; border: 1px solid #333; width: 250px; font-family: sans-serif; font-size:12px;`;
+    box.style = "position:fixed;top:150px;right:20px;background:#111;color:#fff;padding:15px;border-radius:12px;z-index:99999;width:270px;font-family:sans-serif;box-shadow:0 0 15px #00ff88; border: 2px solid #222;";
+
     box.innerHTML = `
-        <b style="color:#00ff88;">BOT CKG ULTIMATE</b><br><br>
-        <input id="nikAI" placeholder="NIK..." style="width:100%; margin-bottom:8px; padding:5px; border-radius:4px; background:#222; color:#fff; border:1px solid #444;"><br>
-        <button id="btnH1" style="width:100%; cursor:pointer; background:#00ff88; border:none; padding:8px; font-weight:bold; margin-bottom:5px; border-radius:4px; color:#000;">1. HAL 1</button>
-        <button id="btnH2" style="width:100%; cursor:pointer; background:#ffcc00; border:none; padding:8px; font-weight:bold; border-radius:4px; color:#000;">2. HAL 2</button>
-        <div id="infoAI" style="margin-top:10px; line-height:1.4;"></div>
+        <div id="dragHeader" style="text-align:center; margin-bottom:10px; cursor:move; background:#222; padding:8px; border-radius:8px; border:1px solid #444;" title="Klik dan tahan untuk menggeser bot">
+            <b style="color:#00ff88; font-size:16px;">BOT CKG V30</b><br>
+            <span style="font-size:10px; color:#aaa; letter-spacing:1px;">THE FINAL FIX</span>
+        </div>
+        <div style="background:#222; padding:10px; border-radius:8px; text-align:center; margin-bottom:10px; border:1px solid #444;">
+            <b style="color:#ffcc00; font-size:11px;">⚡ TEMPEL/SCAN NIK DI SINI ⚡</b><br>
+            <input id="nikAI" placeholder="16 Digit NIK..." style="width:90%; margin-top:8px; padding:8px; border-radius:5px; background:#000; color:#00ff88; font-weight:bold; text-align:center; border:1px solid #00ff88; outline:none;">
+        </div>
+        <div id="infoAI" style="font-size:12px; line-height:1.5; color:#ccc;">
+            Status: <b style="color:#00ff88;">Siaga. Menunggu NIK...</b>
+        </div>
     `;
     document.body.appendChild(box);
-    document.getElementById("btnH1").onclick = runHal1;
-    document.getElementById("btnH2").onclick = runHal2;
+
+    const dragHeader = document.getElementById("dragHeader");
+    let isDraggingBox = false;
+    let offsetX, offsetY;
+
+    dragHeader.addEventListener('mousedown', function(e) {
+        isDraggingBox = true;
+        offsetX = e.clientX - box.getBoundingClientRect().left;
+        offsetY = e.clientY - box.getBoundingClientRect().top;
+        box.style.opacity = "0.8";
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (isDraggingBox) {
+            box.style.right = 'auto';
+            box.style.bottom = 'auto';
+            box.style.left = (e.clientX - offsetX) + 'px';
+            box.style.top = (e.clientY - offsetY) + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', function() {
+        if (isDraggingBox) {
+            isDraggingBox = false;
+            box.style.opacity = "1";
+        }
+    });
+
+    document.getElementById("nikAI").addEventListener('input', async (e) => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length === 16 && !isProcessing) {
+            isProcessing = true;
+            document.getElementById("infoAI").innerHTML = `<b style="color:#ffcc00;">Mencari NIK: ${val}...</b>`;
+
+            try {
+                let data = await cariData(val);
+                if (data) {
+                    await autoPilotSikatHabis(data);
+                } else {
+                    document.getElementById("infoAI").innerHTML = `<b style="color:#ff3333;">Data NIK ${val} tidak ditemukan!</b>`;
+                }
+            } catch (err) {
+                console.log("[BOT ERROR]", err);
+                hideLoading();
+                document.getElementById("infoAI").innerHTML = `<b style="color:#ff3333;">Terjadi Kendala. Coba lagi!</b>`;
+            } finally {
+                e.target.value = "";
+                isProcessing = false;
+            }
+        }
+    });
 }
 setTimeout(initUI, 1500);
 })();
