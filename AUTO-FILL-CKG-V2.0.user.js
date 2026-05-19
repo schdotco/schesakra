@@ -10,8 +10,8 @@ const SHEETS = [
         gids: ["2065767248"],
         colNama: 3, colTgl: 6, colWA: 5, colJK: 8, colPekerjaan: 9, colKelurahan: 10,
         colKelas: 6,
-        colAlamat: 15,
-        colDisabilitas: 11,
+        colAlamat: 14,
+        colMartial: 15,
         waStatis: true
     },
     {
@@ -118,6 +118,7 @@ async function cariData(nikInput){
                         kelurahan: row[source.colKelurahan] || "-",
                         sekolah: row[source.colSekolah] || "-",
                         disabilitas: (row[source.colDisabilitas] || "").trim(),
+                        Martial: (row[source.colMartial] || "").trim(),
                         kelas: (row[source.colKelas] || "").trim()
                     };
                 }
