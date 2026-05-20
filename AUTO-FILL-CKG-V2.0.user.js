@@ -292,30 +292,37 @@ async function eksekusiHalamanDua(data) {
         }
     }
 
-    // 5. DETAIL ALAMAT
+// 5. DETAIL ALAMAT (DIKUNCI AMAN BERDASARKAN ID & PLACEHOLDER NYATA)
     showLoading("⚡ MENYUNTIKKAN ALAMAT... ⚡");
 
-    let inpAlamat = document.querySelector('textarea[placeholder*="alamat" i]')
+    // Mencari berdasarkan ID spesifik Ant Design (Sangat Akurat) atau placeholder alamat
+    let inpAlamat = document.getElementById('address')
+                 || document.getElementById('deliveryAddress')
+                 || document.querySelector('textarea[id*="alamat" i]')
+                 || document.querySelector('textarea[placeholder*="alamat" i]')
                  || document.querySelector('textarea[placeholder*="domisili" i]')
                  || getInput("detail alamat")
-                 || getInput("domisili")
-                 || getInput("alamat")
-                 || document.querySelector('textarea');
+                 || getInput("alamat");
+                 // 🗑️ document.querySelector('textarea') YANG LIAR SUDAH DIBUANG AGAR TIDAK NYASAR KE TEKANAN DARAH!
 
     if (inpAlamat) {
         inpAlamat.scrollIntoView({ behavior: "smooth", block: "center" });
-        safeClick(inpAlamat);
+        safeClick(inpAlamat); 
         await wait(300);
 
-        forceInject(inpAlamat, data.alamat);
+        // Pastikan data alamat tersedia, jika tidak ada fallback ke strip
+        let alamatTarget = data.alamat || "-";
+        forceInject(inpAlamat, alamatTarget);
 
         inpAlamat.dispatchEvent(new Event('input', { bubbles:true }));
         inpAlamat.dispatchEvent(new Event('change', { bubbles:true }));
         inpAlamat.blur();
         await wait(300);
+        console.log("[BOT] Sukses mengunci form dan mengisi alamat:", alamatTarget);
+    } else {
+        console.log("[BOT] Form alamat tidak ditemukan. Pengisian dilewati agar tidak merusak form medis!");
     }
-}
-
+    
 /* ================= SISTEM SEMI AUTO-PILOT ================= */
 async function autoPilotSikatHabis(data) {
     currentScrapedData = data;
