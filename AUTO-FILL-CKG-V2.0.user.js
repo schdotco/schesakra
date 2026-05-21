@@ -70,58 +70,243 @@ function getInput(keyword){
 }
 
 // Ritme klik manusia untuk elemen statis non-dropdown
-function safeClick(el) {
-    if (!el) return false;
-    try {
-        el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true}));
-        setTimeout(() => {
-            el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true}));
-            el.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
-        }, 40);
-        return true;
-    } catch(e) { return false; }
+async function ultraClick(el){
+
+    if(!el) return false;
+
+    const rect = el.getBoundingClientRect();
+
+    const x = rect.left + rect.width/2;
+    const y = rect.top + rect.height/2;
+
+    el.scrollIntoView({
+        behavior:'smooth',
+        block:'center'
+    });
+
+    await wait(300);
+
+    ['pointerover','mouseover','mouseenter'].forEach(type=>{
+
+        el.dispatchEvent(new MouseEvent(type,{
+            bubbles:true,
+            clientX:x,
+            clientY:y
+        }));
+    });
+
+    await wait(80);
+
+    el.dispatchEvent(new PointerEvent('pointerdown',{
+        bubbles:true,
+        pointerType:'mouse',
+        clientX:x,
+        clientY:y,
+        isPrimary:true
+    }));
+
+    el.dispatchEvent(new MouseEvent('mousedown',{
+        bubbles:true,
+        clientX:x,
+        clientY:y
+    }));
+
+    await wait(120);
+
+    el.dispatchEvent(new PointerEvent('pointerup',{
+        bubbles:true,
+        pointerType:'mouse',
+        clientX:x,
+        clientY:y,
+        isPrimary:true
+    }));
+
+    el.dispatchEvent(new MouseEvent('mouseup',{
+        bubbles:true,
+        clientX:x,
+        clientY:y
+    }));
+
+    await wait(50);
+
+    el.click();
+
+    return true;
 }
 
 /* ================= TARIK DATA ================= */
+function parseCSV(text){
+
+    const rows = [];
+    let row = [];
+    let current = "";
+    let insideQuote = false;
+
+    for(let i=0;i<text.length;i++){
+
+        const char = text[i];
+        const next = text[i+1];
+
+        if(char === '"'){
+
+            if(insideQuote && next === '"'){
+
+                current += '"';
+                i++;
+
+            }else{
+
+                insideQuote = !insideQuote;
+            }
+        }
+
+        else if(char === ',' && !insideQuote){
+
+            row.push(current);
+            current = "";
+        }
+
+        else if(
+            (char === '\n' || char === '\r')
+            && !insideQuote
+        ){
+
+            if(current || row.length){
+
+                row.push(current);
+
+                rows.push(row);
+
+                row = [];
+                current = "";
+            }
+        }
+
+        else{
+
+            current += char;
+        }
+    }
+
+    if(current || row.length){
+
+        row.push(current);
+
+        rows.push(row);
+    }
+
+    return rows;
+}
+
 async function cariData(nikInput){
+
     const target = normalizeNIK(nikInput);
+
     for(const source of SHEETS){
+
         for(const gid of source.gids){
+
             const csv = await new Promise(resolve => {
+
                 GM_xmlhttpRequest({
+
                     method: "GET",
-                    url: `https://docs.google.com/spreadsheets/d/${source.id}/export?format=csv&gid=${gid}`,
+
+                    url:
+                    `https://docs.google.com/spreadsheets/d/${source.id}/export?format=csv&gid=${gid}`,
+
                     timeout: 10000,
-                    onload: r => resolve(r.responseText || ""),
-                    onerror: () => resolve("")
+
+                    onload: r =>
+                        resolve(r.responseText || ""),
+
+                    onerror: () =>
+                        resolve("")
                 });
             });
 
-            if (!csv || csv.trim() === "") continue;
-            const rows = csv.trim().split(/\r?\n/).map(r => r.split(","));
-            let waD2 = (source.waStatis && rows[1]) ? normalizeNIK(rows[1][3]) : "";
+            if(!csv || csv.trim()==="") continue;
 
-            for(let i = 1; i < rows.length; i++){
+            /* ================= FIX CSV ================= */
+
+            const rows = parseCSV(csv);
+
+            /* ================= WA STATIS ================= */
+
+            let waD2 =
+                (source.waStatis && rows[1])
+                ?
+                normalizeNIK(rows[1][3])
+                :
+                "";
+
+            for(let i=1;i<rows.length;i++){
+
                 const row = rows[i];
-                if(row.find(col => normalizeNIK(col) === target)){
+
+                if(
+                    row.find(
+                        col =>
+                        normalizeNIK(col)
+                        === target
+                    )
+                ){
+
                     return {
+
                         nik: target,
-                        nama: (row[source.colNama] || "").trim(),
-                        tgl: (row[source.colTgl] || "").trim(),
-                        hp: waD2 || (row[source.colWA] || "").replace(/\D/g,''),
-                        jk: (row[source.colJK] || "").trim(),
-                        alamat: row[source.colAlamat] || "-",
-                        pekerjaan: row[source.colPekerjaan] || "-",
-                        kelurahan: row[source.colKelurahan] || "-",
-                        sekolah: row[source.colSekolah] || "-",
-                        disabilitas: (row[source.colDisabilitas] || "").trim(),
-                        Martial: (row[source.colMartial] || "").trim(),
-                        kelas: (row[source.colKelas] || "").trim()
+
+                        nama:
+                            (row[source.colNama] || "")
+                            .trim(),
+
+                        tgl:
+                            (row[source.colTgl] || "")
+                            .trim(),
+
+                        hp:
+                            waD2
+                            ||
+                            (row[source.colWA] || "")
+                            .replace(/\D/g,''),
+
+                        jk:
+                            (row[source.colJK] || "")
+                            .trim(),
+
+                        alamat:
+                            row[source.colAlamat]
+                            || "-",
+
+                        pekerjaan:
+                            row[source.colPekerjaan]
+                            || "-",
+
+                        kelurahan:
+                            row[source.colKelurahan]
+                            || "-",
+
+                        sekolah:
+                            row[source.colSekolah]
+                            || "-",
+
+                        disabilitas:
+                            (row[source.colDisabilitas] || "")
+                            .trim(),
+
+                        Martial:
+                            (row[source.colMartial] || "")
+                            .trim(),
+
+                        kelas:
+                            (row[source.colKelas] || "")
+                            .trim()
                     };
                 }
             }
         }
     }
+
     return null;
 }
 
@@ -231,7 +416,7 @@ async function eksekusiHalamanDua(data) {
             const triggerSekolah = containerSekolah.querySelector('.ant-select-selector') || containerSekolah.querySelector('input') || containerSekolah.querySelector('button') || containerSekolah;
             if (triggerSekolah) {
                 triggerSekolah.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                safeClick(triggerSekolah);
+                ultraClick(triggerSekolah);
                 showLoading("⏳ Menunggu Pop-up Sekolah terbuka...");
 
                 let inputCariSekolah = null;
@@ -250,7 +435,7 @@ async function eksekusiHalamanDua(data) {
                     await wait(500);
 
                     btnSubmitCari.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                    safeClick(btnSubmitCari);
+                    ultraClick(btnSubmitCari);
 
                     showLoading("⏳ Mencari Sekolah di database Kemenkes...");
                     await wait(3000);
@@ -264,11 +449,11 @@ async function eksekusiHalamanDua(data) {
 
                     if (hasilPertama) {
                         hasilPertama.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                        safeClick(hasilPertama);
+                        ultraClick(hasilPertama);
                         await wait(1000);
                     } else {
                         const btnClose = document.querySelector('.ant-modal-close');
-                        if (btnClose) safeClick(btnClose);
+                        if (btnClose) ultraClick(btnClose);
                     }
                 }
             }
@@ -287,7 +472,7 @@ async function eksekusiHalamanDua(data) {
         if (!checkboxSamaKTP.className.includes('ant-checkbox-wrapper-checked') && !checkboxSamaKTP.querySelector('.ant-checkbox-checked')) {
             checkboxSamaKTP.scrollIntoView({ behavior: "smooth", block: "center" });
             checkboxSamaKTP.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-            safeClick(checkboxSamaKTP);
+            ultraClick(checkboxSamaKTP);
             await wait(500);
         }
     }
@@ -306,7 +491,7 @@ async function eksekusiHalamanDua(data) {
 
     if (inpAlamat) {
         inpAlamat.scrollIntoView({ behavior: "smooth", block: "center" });
-        safeClick(inpAlamat);
+        ultraClick(inpAlamat);
         await wait(300);
 
         let alamatTarget = data.alamat || "-";
@@ -329,7 +514,7 @@ async function autoPilotSikatHabis(data) {
 
     const btnTambah = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tambah Baru') || b.innerText.includes('Tambah Peserta'));
     if (btnTambah && !document.querySelector('.ant-modal-content')) {
-        safeClick(btnTambah);
+        ultraClick(btnTambah);
         await wait(1500);
     }
 
@@ -338,7 +523,7 @@ async function autoPilotSikatHabis(data) {
         forceInject(inpNIK, data.nik);
         await wait(300);
         const btnCek = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Cek NIK') || b.innerText.includes('Cari'));
-        if (btnCek) safeClick(btnCek);
+        if (btnCek) ultraClick(btnCek);
     }
 
     showLoading("⏳ Menunggu Dukcapil Mereset Form...");
@@ -380,7 +565,7 @@ async function autoPilotSikatHabis(data) {
         await wait(500);
     }
 
-    safeClick(btnLanjut);
+    ultraClick(btnLanjut);
 
     document.getElementById("infoAI").innerHTML = `
         <div style="background:#ff3333; color:#fff; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:8px; animation: pulse 1.5s infinite;">
