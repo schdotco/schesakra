@@ -539,56 +539,209 @@ async function autoPilotSikatHabis(data) {
     if (inpWA) forceInject(inpWA, cleanHP);
 
     // EKSEKUSI DROPDOWN JENIS KELAMIN HALAMAN 1 (RITME BARU AMAN STABIL)
-    await smartClickDropdown("Jenis Kelamin", data.jk);
+/* ================= ISI JK ================= */
 
-    hideLoading();
-    document.getElementById("infoAI").innerHTML = `
-        <div style="background:#ffcc00; color:#000; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:8px; animation: pulse 1.5s infinite;">
-            ⏳ TGL LAHIR ISI MANUAL!
-        </div>
-        <div style="background:#222; border:1px solid #555; padding:8px; border-radius:5px; font-size:12px; line-height:1.6;">
-            <b>📌 CONTEKAN DATA:</b><br>
-            • Tgl Lahir: <b style="color:#00ff88; font-size:14px;">${data.tgl}</b><br>
-            • Kelamin: <b style="color:#00ff88;">${data.jk}</b><br>
-            • Sekolah: <b style="color:#00ff88;">${data.sekolah}</b><br>
-            • Kelas: <b style="color:#00ff88;">${data.kelas}</b>
-        </div>
-        <div style="margin-top:8px; font-size:11px; color:#aaa; text-align:center;">Bot memantau tombol <b>'Selanjutnya'</b>...</div>
-    `;
+await smartClickDropdown(
+    "Jenis Kelamin",
+    data.jk
+);
 
-    let btnLanjut = null;
-    while (true) {
-        btnLanjut = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Selanjutnya'));
-        if (btnLanjut && !btnLanjut.disabled && !btnLanjut.classList.contains('ant-btn-disabled')) {
-            break;
-        }
-        await wait(500);
+await wait(1200);
+
+/* ================= ISI TANGGAL ================= */
+
+const inputTanggal =
+    document.querySelector(
+        '.ant-picker-input input'
+    );
+
+if(inputTanggal){
+
+    await ultraClick(inputTanggal);
+
+    await wait(800);
+
+    inputTanggal.removeAttribute(
+        'readonly'
+    );
+
+    const nativeSetter =
+        Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            'value'
+        ).set;
+
+    nativeSetter.call(
+        inputTanggal,
+        ''
+    );
+
+    inputTanggal.dispatchEvent(
+        new Event(
+            'input',
+            { bubbles:true }
+        )
+    );
+
+    await wait(300);
+
+    nativeSetter.call(
+        inputTanggal,
+        data.tgl
+    );
+
+    inputTanggal.dispatchEvent(
+        new Event(
+            'input',
+            { bubbles:true }
+        )
+    );
+
+    inputTanggal.dispatchEvent(
+        new Event(
+            'change',
+            { bubbles:true }
+        )
+    );
+
+    inputTanggal.dispatchEvent(
+        new KeyboardEvent(
+            'keydown',
+            {
+                key:'Enter',
+                code:'Enter',
+                keyCode:13,
+                which:13,
+                bubbles:true
+            }
+        )
+    );
+
+    inputTanggal.dispatchEvent(
+        new KeyboardEvent(
+            'keyup',
+            {
+                key:'Enter',
+                code:'Enter',
+                keyCode:13,
+                which:13,
+                bubbles:true
+            }
+        )
+    );
+
+    await wait(1200);
+
+    inputTanggal.blur();
+}
+
+/* ================= INFO UI ================= */
+
+hideLoading();
+
+document.getElementById(
+    "infoAI"
+).innerHTML = `
+
+    <div style="
+        background:#00ff88;
+        color:#000;
+        padding:8px;
+        border-radius:5px;
+        text-align:center;
+        font-weight:bold;
+        margin-bottom:8px;
+    ">
+        ✅ HALAMAN 1 OTOMATIS
+    </div>
+
+    <div style="
+        background:#222;
+        border:1px solid #555;
+        padding:8px;
+        border-radius:5px;
+        font-size:12px;
+        line-height:1.6;
+    ">
+
+        <b>📌 DATA TERISI:</b><br>
+
+        • Nama:
+        <b style="color:#00ff88;">
+            ${data.nama}
+        </b><br>
+
+        • Tgl:
+        <b style="color:#00ff88;">
+            ${data.tgl}
+        </b><br>
+
+        • JK:
+        <b style="color:#00ff88;">
+            ${data.jk}
+        </b><br>
+
+        • Sekolah:
+        <b style="color:#00ff88;">
+            ${data.sekolah}
+        </b><br>
+
+        • Kelas:
+        <b style="color:#00ff88;">
+            ${data.kelas}
+        </b>
+
+    </div>
+
+    <div style="
+        margin-top:8px;
+        font-size:11px;
+        color:#aaa;
+        text-align:center;
+    ">
+        Bot memantau tombol
+        <b>'Selanjutnya'</b>...
+    </div>
+`;
+
+/* ================= AUTO NEXT ================= */
+
+let btnLanjut = null;
+
+while(true){
+
+    btnLanjut =
+        Array.from(
+            document.querySelectorAll(
+                'button'
+            )
+        ).find(
+            b =>
+            b.innerText.includes(
+                'Selanjutnya'
+            )
+        );
+
+    if(
+        btnLanjut &&
+        !btnLanjut.disabled &&
+        !btnLanjut.classList.contains(
+            'ant-btn-disabled'
+        )
+    ){
+        break;
     }
 
-    ultraClick(btnLanjut);
-
-    document.getElementById("infoAI").innerHTML = `
-        <div style="background:#ff3333; color:#fff; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:8px; animation: pulse 1.5s infinite;">
-            🚨 KLIK 'SIMPAN' DI LAYAR! 🚨
-        </div>
-        <div style="font-size:12px; color:#ccc; text-align:center; margin-bottom:10px;">Jika Halaman 2 sudah terbuka, klik tombol hijau di bawah ini:</div>
-        <button id="btnGasHal2" style="width:100%; padding:12px; background:#00ff88; color:#000; font-size:14px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow: 0 0 15px #00ff88; text-transform:uppercase;">🚀 GAS ISI HALAMAN 2</button>
-    `;
-
-    document.getElementById("btnGasHal2").onclick = async () => {
-        document.getElementById("infoAI").innerHTML = `<div style="text-align:center; color:#ffcc00; font-weight:bold;">Memproses Halaman 2...</div>`;
-        await eksekusiHalamanDua(currentScrapedData);
-        hideLoading();
-        document.getElementById("infoAI").innerHTML = `
-            <div style="background:#00ff88; color:#000; padding:8px; border-radius:5px; text-align:center; font-weight:bold; margin-bottom:5px;">
-                ✅ SELURUH FORM TERISI!
-            </div>
-            <b>Nama:</b> ${currentScrapedData.nama}<br>
-            <b>Sekolah:</b> ${currentScrapedData.sekolah}<br>
-            <b>Kelas:</b> ${currentScrapedData.kelas}
-        `;
-    };
+    await wait(500);
 }
+
+await ultraClick(btnLanjut);
+
+await wait(4000);
+
+/* ================= HALAMAN 2 ================= */
+
+await eksekusiHalamanDua(data);
 
 /* ================= UI KONTROL & DRAGGABLE LOGIC ================= */
 function initUI(){
