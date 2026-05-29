@@ -341,8 +341,15 @@ return {
         .trim(),
 
     kelas:
-        (row[source.colKelas] || "")
-        .trim()
+    (row[source.colKelas] || "")
+    .trim()
+
+};
+
+                }
+            }
+        }
+    }
 
     return null;
 }
@@ -542,7 +549,7 @@ async function eksekusiHalamanDua(data) {
     } else {
         console.log("[BOT] Form alamat belum/tidak ditemukan di halaman ini. Dilewati demi keamanan form medis.");
     }
-    
+
 /* ================= SISTEM SEMI AUTO-PILOT ================= */
 async function autoPilotSikatHabis(data) {
     currentScrapedData = data;
