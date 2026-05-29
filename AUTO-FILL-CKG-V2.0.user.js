@@ -8,7 +8,7 @@ const SHEETS = [
     {
         id: "1kDShNBXFk3QtrrGaEX0fTjmRd1zGjb0s9n21a_1oHSM",
         gids: ["2065767248"],
-        colNama: 3, colTgl: 6, colWA: 5, colJK: 6, colPekerjaan: 7, colKelurahan: 8, colAlamat: 11, colMartial: 12,
+        colNama: 3, colTgl: 6, colWA: 5, colJK: 8 , colPekerjaan: 9, colKelurahan: 10, colAlamat: 13, colMartial: 14,
         waStatis: true
     },
     {
@@ -252,60 +252,55 @@ async function cariData(nikInput){
                     )
                 ){
 
-                    return {
+return {
 
-                        nik: target,
+    nik: target,
 
-                        nama:
-                            (row[source.colNama] || "")
-                            .trim(),
+    nama:
+        (row[source.colNama] || "")
+        .trim(),
 
-                        tgl:
-                            (row[source.colTgl] || "")
-                            .trim(),
+    tgl:
+        (row[source.colTgl] || "")
+        .trim(),
 
-                        hp:
-                            waD2
-                            ||
-                            (row[source.colWA] || "")
-                            .replace(/\D/g,''),
+    hp:
+        waD2
+        ||
+        (row[source.colWA] || "")
+        .replace(/\D/g,''),
 
-                        jk:
-                            (row[source.colJK] || "")
-                            .trim(),
+    jk:
+        (row[source.colJK] || "")
+        .trim(),
 
-                        alamat:
-                            row[source.colAlamat]
-                            || "-",
+    alamat:
+        (row[source.colAlamat] || "")
+        .trim(),
 
-                        pekerjaan:
-                            row[source.colPekerjaan]
-                            || "-",
+    pekerjaan:
+        (row[source.colPekerjaan] || "")
+        .trim(),
 
-                        kelurahan:
-                            row[source.colKelurahan]
-                            || "-",
+    kelurahan:
+        (row[source.colKelurahan] || "")
+        .trim(),
 
-                        sekolah:
-                            row[source.colSekolah]
-                            || "-",
+    sekolah:
+        (row[source.colSekolah] || "")
+        .trim(),
 
-                        disabilitas:
-                            (row[source.colDisabilitas] || "")
-                            .trim(),
+    disabilitas:
+        (row[source.colDisabilitas] || "")
+        .trim(),
 
-                        Martial:
-                            (row[source.colMartial] || "")
-                            .trim(),
+    Martial:
+        (row[source.colMartial] || "")
+        .trim(),
 
-                        kelas:
-                            (row[source.colKelas] || "")
-                            .trim()
-                    };
-                }
-            }
-        }
-    }
+    kelas:
+        (row[source.colKelas] || "")
+        .trim()
 
     return null;
 }
