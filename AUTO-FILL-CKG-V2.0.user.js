@@ -8,7 +8,7 @@ const SHEETS = [
     {
         id: "1kDShNBXFk3QtrrGaEX0fTjmRd1zGjb0s9n21a_1oHSM",
         gids: ["2065767248"],
-        colNama: 3, colTgl: 6, colWA: 5, colJK: 8, colPekerjaan: 9, colKelurahan: 10, colAlamat: 13, colMartial: 14,
+        colNama: 3, colTgl: 6, colWA: 5, colJK: 6, colPekerjaan: 7, colKelurahan: 8, colAlamat: 11, colMartial: 12,
         waStatis: true
     },
     {
