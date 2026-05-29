@@ -3,23 +3,65 @@
 
 function wait(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
-/* ================= CONFIG SPREADSHEET ================= */
-const SHEETS = [
-    {
-        id: "1kDShNBXFk3QtrrGaEX0fTjmRd1zGjb0s9n21a_1oHSM",
-        gids: ["2065767248"],
-        colNama: 3, colTgl: 6, colWA: 5, colJK: 8 , colPekerjaan: 9, colKelurahan: 10, colAlamat: 13, colMartial: 14,
-        waStatis: true
-    },
-    {
-        id: "167bRhDc_SniwuCmYvmkdDXtvlu1oQ6wVCeZiESwo0sI",
-        gids: ["126079672", "1947531650", "1920180130"],
-        colNama: 4, colJK: 5, colTgl: 9, colWA: 12, colAlamat: 11, colSekolah: 3, // -> Sudah ditambahkan koma (Fix)
-        colKelas: 6,
-        colDisabilitas: 15,
-        waStatis: false
-    }
-];
+/* ================= PILIH MODE CKG ================= */
+
+let pilihanCKG = prompt(
+`Pilih Mode CKG:
+
+1 = CKG UMUM
+2 = CKG SEKOLAH
+
+Masukkan angka 1 atau 2`
+);
+
+if (!pilihanCKG) pilihanCKG = "1";
+
+let SHEETS = [];
+
+/* ================= CKG UMUM ================= */
+
+if (pilihanCKG === "1") {
+
+    SHEETS = [
+        {
+            id: "1kDShNBXFk3QtrrGaEX0fTjmRd1zGjb0s9n21a_1oHSM",
+            gids: ["2065767248"],
+            colNama: 3,
+            colTgl: 6,
+            colWA: 5,
+            colJK: 8,
+            colPekerjaan: 9,
+            colKelurahan: 10,
+            colAlamat: 13,
+            colMartial: 14,
+            waStatis: true
+        }
+    ];
+
+    console.log("MODE: CKG UMUM");
+
+/* ================= CKG SEKOLAH ================= */
+
+} else {
+
+    SHEETS = [
+        {
+            id: "167bRhDc_SniwuCmYvmkdDXtvlu1oQ6wVCeZiESwo0sI",
+            gids: ["126079672", "1947531650", "1920180130"],
+            colNama: 4,
+            colJK: 5,
+            colTgl: 9,
+            colWA: 12,
+            colAlamat: 11,
+            colSekolah: 3,
+            colKelas: 6,
+            colDisabilitas: 15,
+            waStatis: false
+        }
+    ];
+
+    console.log("MODE: CKG SEKOLAH");
+}
 
 let isProcessing = false;
 let loadingEl = null;
